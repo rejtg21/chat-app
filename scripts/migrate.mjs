@@ -54,8 +54,24 @@ const needsTls = (() => {
   }
 })();
 
+// Newer `pg` warns that sslmode=require|prefer|verify-ca will adopt weaker
+// libpq semantics in pg v9. TLS is pinned by the explicit `ssl` option below,
+// so drop the ambiguous parameter and let that be the single source of truth.
+const pinnedConnectionString = (() => {
+  try {
+    const url = new URL(connectionString);
+    const mode = url.searchParams.get("sslmode");
+    if (mode && ["prefer", "require", "verify-ca"].includes(mode)) {
+      url.searchParams.delete("sslmode");
+    }
+    return url.toString();
+  } catch {
+    return connectionString;
+  }
+})();
+
 const client = new pg.Client({
-  connectionString,
+  connectionString: pinnedConnectionString,
   ssl: needsTls ? { rejectUnauthorized: true } : false,
 });
 

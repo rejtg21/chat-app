@@ -33,7 +33,7 @@ export const getPool = (): Pool => {
   }
 
   const config: PoolConfig = {
-    connectionString,
+    connectionString: normaliseSslMode(connectionString),
     // Serverless invocations are short and concurrent; a small ceiling keeps
     // a burst from exhausting the database's connection limit.
     max: 5,
@@ -61,6 +61,27 @@ const needsTls = (connectionString: string): boolean => {
     );
   } catch {
     return true;
+  }
+};
+
+/**
+ * Neon's connection string carries `sslmode=require`. Newer `pg` warns that
+ * `require` (and `prefer`/`verify-ca`) will switch to weaker libpq semantics
+ * in pg v9. TLS here is already pinned by the explicit `ssl` option above
+ * (`rejectUnauthorized: true` == full verification), so drop the ambiguous
+ * parameter and let that object be the single source of truth. `disable` is
+ * left intact — `needsTls` still reads it from the original string.
+ */
+const normaliseSslMode = (connectionString: string): string => {
+  try {
+    const url = new URL(connectionString);
+    const mode = url.searchParams.get("sslmode");
+    if (mode && ["prefer", "require", "verify-ca"].includes(mode)) {
+      url.searchParams.delete("sslmode");
+    }
+    return url.toString();
+  } catch {
+    return connectionString;
   }
 };
 
