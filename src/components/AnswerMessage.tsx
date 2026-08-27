@@ -11,7 +11,7 @@ import type { Citation, MessageUiState, RetrievalMeta } from "@/lib/types";
  * finished — that is the specified behaviour, and it is also the honest one:
  * a half-streamed answer has not finished saying what it cites.
  */
-export function AnswerMessage({
+export const AnswerMessage = ({
   text,
   streaming,
   retrieval,
@@ -31,7 +31,7 @@ export function AnswerMessage({
   onToggleChecklistItem: (index: number) => void;
   onToggleEvidenceCard: (index: number) => void;
   onFocusChunk: (chunkId: string) => void;
-}) {
+}) => {
   const paragraphs = text.split("\n").filter((line) => line.trim().length > 0);
 
   return (
@@ -80,9 +80,9 @@ export function AnswerMessage({
       ) : null}
     </div>
   );
-}
+};
 
-function Caret() {
+const Caret = () => {
   return (
     <span
       className="blink"
@@ -96,19 +96,19 @@ function Caret() {
       }}
     />
   );
-}
+};
 
 /**
  * Excerpts are shown in full rather than behind a tooltip. Verifiability is
  * the product here, so the evidence is visible by default.
  */
-function Citations({
+const Citations = ({
   citations,
   onFocusChunk,
 }: {
   citations: Citation[];
   onFocusChunk: (chunkId: string) => void;
-}) {
+}) => {
   return (
     <div
       style={{
@@ -177,4 +177,4 @@ function Citations({
       </div>
     </div>
   );
-}
+};

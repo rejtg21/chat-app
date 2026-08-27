@@ -27,7 +27,7 @@ const SKELETONS = [
   ["90%", "68%", "84%"],
 ];
 
-export function SourcePane({
+export const SourcePane = ({
   document,
   chunks,
   outline,
@@ -45,7 +45,7 @@ export function SourcePane({
   activeChunkId: string | null;
   onFocusChunk: (chunkId: string) => void;
   upload: UploadProgress | null;
-}) {
+}) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Bring the cited chunk to the top of the pane. Re-runs on tab change too,
@@ -155,10 +155,10 @@ export function SourcePane({
       ) : null}
     </aside>
   );
-}
+};
 
 /** 5b. Real progress, reported by the indexing stream, not a timer. */
-function ParsingPanel({ upload }: { upload: UploadProgress }) {
+const ParsingPanel = ({ upload }: { upload: UploadProgress }) => {
   const stages = [
     "Uploading file",
     "Extracting text",
@@ -256,10 +256,10 @@ function ParsingPanel({ upload }: { upload: UploadProgress }) {
       </div>
     </div>
   );
-}
+};
 
 /** 5a. Nothing indexed yet. */
-function SourceEmpty() {
+const SourceEmpty = () => {
   return (
     <div
       style={{
@@ -304,10 +304,10 @@ function SourceEmpty() {
       </p>
     </div>
   );
-}
+};
 
 /** 5c. */
-function Outline({
+const Outline = ({
   document,
   outline,
   onJump,
@@ -315,7 +315,7 @@ function Outline({
   document: DocumentSummary;
   outline: OutlineSection[];
   onJump: (section: OutlineSection) => void;
-}) {
+}) => {
   return (
     <div>
       <div
@@ -378,20 +378,20 @@ function Outline({
       </div>
     </div>
   );
-}
+};
 
 /**
  * 5d. Chunk ids, token counts and vector widths are exposed on purpose: the
  * retrieval pipeline is what makes the answers credible, so it is inspectable
  * rather than hidden.
  */
-function Chunks({
+const Chunks = ({
   chunks,
   activeChunkId,
 }: {
   chunks: ChunkRecord[];
   activeChunkId: string | null;
-}) {
+}) => {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
       {chunks.map((chunk) => {
@@ -445,4 +445,4 @@ function Chunks({
       })}
     </div>
   );
-}
+};

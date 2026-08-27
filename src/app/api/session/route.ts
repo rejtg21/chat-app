@@ -17,7 +17,7 @@ import type { SessionPayload } from "@/lib/types";
  */
 export const runtime = "nodejs";
 
-export async function GET(): Promise<Response> {
+export const GET = async (): Promise<Response> => {
   try {
     const document = await getCurrentDocument();
 
@@ -49,4 +49,4 @@ export async function GET(): Promise<Response> {
   } catch (error) {
     return toErrorResponse(error);
   }
-}
+};

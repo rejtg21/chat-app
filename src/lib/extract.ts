@@ -29,17 +29,17 @@ export interface Extraction {
 }
 
 /** Lowercased extension without the dot, or "" when there isn't one. */
-export function extensionOf(filename: string): string {
+export const extensionOf = (filename: string): string => {
   const match = /\.([A-Za-z0-9]+)$/.exec(filename);
   return match ? match[1].toLowerCase() : "";
-}
+};
 
-export function isAcceptedExtension(extension: string): boolean {
+export const isAcceptedExtension = (extension: string): boolean => {
   return (ACCEPTED_EXTENSIONS as readonly string[]).includes(extension);
-}
+};
 
 /** Map an accepted extension onto the stored document kind. */
-export function kindForExtension(extension: string): DocumentKind {
+export const kindForExtension = (extension: string): DocumentKind => {
   switch (extension) {
     case "pdf":
       return "pdf";
@@ -55,17 +55,17 @@ export function kindForExtension(extension: string): DocumentKind {
         { detail: `unrecognised extension: ${extension || "none"}` },
       );
   }
-}
+};
 
 /**
  * Extract text from an uploaded file. Throws ApiError with
  * ERR_UNSUPPORTED_TYPE for anything that is not PDF/TXT/MD — the UI renders
  * that as the "Unsupported file" card, and nothing is written to the database.
  */
-export async function extractDocument(
+export const extractDocument = async (
   filename: string,
   bytes: ArrayBuffer,
-): Promise<Extraction> {
+): Promise<Extraction> => {
   const extension = extensionOf(filename);
   if (!isAcceptedExtension(extension)) {
     throw unsupportedFileError(filename, extension);
@@ -73,9 +73,9 @@ export async function extractDocument(
 
   const kind = kindForExtension(extension);
   return kind === "pdf" ? extractPdf(bytes) : extractPlainText(bytes, kind);
-}
+};
 
-async function extractPdf(bytes: ArrayBuffer): Promise<Extraction> {
+const extractPdf = async (bytes: ArrayBuffer): Promise<Extraction> => {
   let pageTexts: string[];
   let totalPages: number;
 
@@ -107,9 +107,9 @@ async function extractPdf(bytes: ArrayBuffer): Promise<Extraction> {
   }
 
   return { kind: "pdf", pages, text, pageCount: totalPages, lineCount: null };
-}
+};
 
-function extractPlainText(bytes: ArrayBuffer, kind: DocumentKind): Extraction {
+const extractPlainText = (bytes: ArrayBuffer, kind: DocumentKind): Extraction => {
   const raw = new TextDecoder("utf-8").decode(bytes);
   const text = normalise(raw);
 
@@ -126,9 +126,9 @@ function extractPlainText(bytes: ArrayBuffer, kind: DocumentKind): Extraction {
     pageCount: null,
     lineCount: text.split("\n").length,
   };
-}
+};
 
 /** Normalise newlines and strip the BOM, leaving blank-line structure intact. */
-function normalise(text: string): string {
+const normalise = (text: string): string => {
   return text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
-}
+};

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { Blueprint } from "@/components/Blueprint";
 import { DB_LABEL } from "@/lib/config";
 
-export function Composer({
+export const Composer = ({
   value,
   onChange,
   onSend,
@@ -23,7 +23,7 @@ export function Composer({
   filename: string | null;
   chatId: string | null;
   busy: boolean;
-}) {
+}) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Grow with the content up to the design's 120px ceiling, then scroll.
@@ -129,4 +129,4 @@ export function Composer({
       </div>
     </div>
   );
-}
+};

@@ -38,7 +38,7 @@ const requestSchema = z.object({
   messages: z.array(z.custom<ChatUIMessage>()).min(1),
 });
 
-export async function POST(request: Request): Promise<Response> {
+export const POST = async (request: Request): Promise<Response> => {
   try {
     const parsed = requestSchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -175,4 +175,4 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     return toErrorResponse(error);
   }
-}
+};

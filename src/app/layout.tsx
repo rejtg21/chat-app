@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     "Upload a PDF, TXT or Markdown file and ask questions about it. Answers stream back grounded in the document, citing the section and lines they came from.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+const RootLayout = ({ children }: LayoutProps<"/">) => {
   return (
     <html
       lang="en"
@@ -31,4 +31,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body>{children}</body>
     </html>
   );
-}
+};
+
+export default RootLayout;

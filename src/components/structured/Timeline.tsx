@@ -1,7 +1,7 @@
 import { Kicker, structuredBlockStyle } from "./Kicker";
 import type { TimelinePayload } from "@/lib/structured";
 
-export function Timeline({ payload }: { payload: TimelinePayload }) {
+export const Timeline = ({ payload }: { payload: TimelinePayload }) => {
   return (
     <div style={structuredBlockStyle}>
       <Kicker marginBottom="var(--space-4)">{payload.title}</Kicker>
@@ -73,4 +73,4 @@ export function Timeline({ payload }: { payload: TimelinePayload }) {
       </div>
     </div>
   );
-}
+};

@@ -6,7 +6,7 @@ import { DB_LABEL } from "@/lib/config";
  * static mock. Both errors are reachable for real here (upload a .pptx; lose
  * the database), so the cluster is dropped rather than shipped behind a flag.
  */
-export function Header({ hasDocument }: { hasDocument: boolean }) {
+export const Header = ({ hasDocument }: { hasDocument: boolean }) => {
   return (
     <header
       style={{
@@ -68,4 +68,4 @@ export function Header({ hasDocument }: { hasDocument: boolean }) {
       </div>
     </header>
   );
-}
+};

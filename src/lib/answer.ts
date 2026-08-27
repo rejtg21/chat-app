@@ -28,10 +28,10 @@ import { citationWhere } from "@/lib/format";
  * answer in view, rather than being guessed at token three.
  */
 
-export function buildSystemPrompt(input: {
+export const buildSystemPrompt = (input: {
   filename: string;
   sources: readonly RetrievedChunk[];
-}): string {
+}): string => {
   if (input.sources.length === 0) {
     return [
       `You answer questions about an uploaded document called "${input.filename}".`,
@@ -62,7 +62,7 @@ export function buildSystemPrompt(input: {
     "SOURCES",
     formatSources(input.sources),
   ].join("\n");
-}
+};
 
 /**
  * The annotation schema. "none" is a first-class member so the model always
@@ -107,12 +107,12 @@ const ANNOTATION_INSTRUCTIONS = [
  * fails, or the call errors. Null means the message renders as plain prose,
  * which is the documented fallback and is always a correct rendering.
  */
-export async function annotateAnswer(input: {
+export const annotateAnswer = async (input: {
   question: string;
   answer: string;
   sources: readonly RetrievedChunk[];
   filename: string;
-}): Promise<RenderablePayload | null> {
+}): Promise<RenderablePayload | null> => {
   if (input.sources.length === 0 || !input.answer.trim()) return null;
 
   try {
@@ -173,4 +173,4 @@ export async function annotateAnswer(input: {
     console.error("[annotation] falling back to prose", error);
     return null;
   }
-}
+};

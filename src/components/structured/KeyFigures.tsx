@@ -2,7 +2,7 @@ import { Blueprint } from "@/components/Blueprint";
 import { Kicker, structuredBlockStyle } from "./Kicker";
 import type { KeyFiguresPayload } from "@/lib/structured";
 
-export function KeyFigures({ payload }: { payload: KeyFiguresPayload }) {
+export const KeyFigures = ({ payload }: { payload: KeyFiguresPayload }) => {
   return (
     <div style={structuredBlockStyle}>
       <Kicker>{payload.title}</Kicker>
@@ -44,4 +44,4 @@ export function KeyFigures({ payload }: { payload: KeyFiguresPayload }) {
       </div>
     </div>
   );
-}
+};

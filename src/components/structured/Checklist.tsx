@@ -10,7 +10,7 @@ import type { ChecklistPayload } from "@/lib/structured";
  * message rather than recomputed — recommendations are things you act on over
  * days, and a reload must not wipe the marks.
  */
-export function Checklist({
+export const Checklist = ({
   payload,
   checked,
   onToggle,
@@ -18,7 +18,7 @@ export function Checklist({
   payload: ChecklistPayload;
   checked: Record<string, boolean>;
   onToggle: (index: number) => void;
-}) {
+}) => {
   const done = payload.items.filter((_, index) => checked[String(index)]).length;
 
   return (
@@ -106,4 +106,4 @@ export function Checklist({
       </Blueprint>
     </div>
   );
-}
+};

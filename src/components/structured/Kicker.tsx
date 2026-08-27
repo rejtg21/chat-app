@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The small uppercase accent label that sits above every structured
  * component. All five share this grammar, per the handoff.
  */
-export function Kicker({
+export const Kicker = ({
   children,
   trailing,
   marginBottom = "var(--space-3)",
@@ -12,7 +12,7 @@ export function Kicker({
   children: ReactNode;
   trailing?: ReactNode;
   marginBottom?: string;
-}) {
+}) => {
   if (trailing !== undefined) {
     return (
       <div
@@ -32,7 +32,7 @@ export function Kicker({
   }
 
   return <div style={{ ...kickerText, marginBottom }}>{children}</div>;
-}
+};
 
 const kickerText = {
   fontSize: 10,

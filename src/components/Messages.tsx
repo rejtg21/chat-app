@@ -1,7 +1,7 @@
 import { Blueprint } from "@/components/Blueprint";
 
 /** 3c. The user's question — right-aligned, on the accent's deepest step. */
-export function UserMessage({ text }: { text: string }) {
+export const UserMessage = ({ text }: { text: string }) => {
   return (
     <div style={{ display: "flex", justifyContent: "flex-end" }}>
       <div
@@ -19,10 +19,10 @@ export function UserMessage({ text }: { text: string }) {
       </div>
     </div>
   );
-}
+};
 
 /** 3d. The rule-and-caps note that marks the end of indexing. */
-export function SystemNote({ text }: { text: string }) {
+export const SystemNote = ({ text }: { text: string }) => {
   return (
     <div
       style={{
@@ -40,10 +40,10 @@ export function SystemNote({ text }: { text: string }) {
       <span style={{ height: 1, flex: 1, background: "var(--color-divider)" }} />
     </div>
   );
-}
+};
 
 /** 3e. Shown while the vector search runs, before any token arrives. */
-export function RetrievalShimmer({ chunkCount }: { chunkCount: number }) {
+export const RetrievalShimmer = ({ chunkCount }: { chunkCount: number }) => {
   return (
     <div>
       <div
@@ -76,7 +76,7 @@ export function RetrievalShimmer({ chunkCount }: { chunkCount: number }) {
       </div>
     </div>
   );
-}
+};
 
 /**
  * 3h. Both designed error cards.
@@ -85,7 +85,7 @@ export function RetrievalShimmer({ chunkCount }: { chunkCount: number }) {
  * conversation are safe, because the user's first fear is that they lost
  * their upload.
  */
-export function ErrorCard({
+export const ErrorCard = ({
   kind,
   message,
   code,
@@ -97,7 +97,7 @@ export function ErrorCard({
   code: string;
   actionLabel: string;
   onAction: () => void;
-}) {
+}) => {
   return (
     <Blueprint
       style={{
@@ -137,4 +137,4 @@ export function ErrorCard({
       </button>
     </Blueprint>
   );
-}
+};

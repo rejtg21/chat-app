@@ -7,7 +7,7 @@ import type { ComparisonTablePayload } from "@/lib/structured";
  * colour — this system has no decorative colour to spend, so the "winner" is
  * marked with an accent tint and weight instead.
  */
-export function ComparisonTable({ payload }: { payload: ComparisonTablePayload }) {
+export const ComparisonTable = ({ payload }: { payload: ComparisonTablePayload }) => {
   return (
     <div style={structuredBlockStyle}>
       <Kicker>{payload.title}</Kicker>
@@ -78,4 +78,4 @@ export function ComparisonTable({ payload }: { payload: ComparisonTablePayload }
       </Blueprint>
     </div>
   );
-}
+};

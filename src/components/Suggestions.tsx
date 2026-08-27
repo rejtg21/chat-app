@@ -21,7 +21,7 @@ const SUGGESTIONS = [
   { kind: "Evidence", question: "What is the strongest evidence for its main claim?" },
 ] as const;
 
-export function Suggestions({
+export const Suggestions = ({
   filename,
   chunkCount,
   onAsk,
@@ -29,7 +29,7 @@ export function Suggestions({
   filename: string;
   chunkCount: number;
   onAsk: (question: string) => void;
-}) {
+}) => {
   return (
     <div style={{ maxWidth: 660, margin: "0 auto" }}>
       <h2 style={{ margin: "0 0 var(--space-2)", fontSize: 24 }}>
@@ -87,4 +87,4 @@ export function Suggestions({
       </div>
     </div>
   );
-}
+};

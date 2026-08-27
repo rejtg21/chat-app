@@ -8,6 +8,8 @@ import { DocumentChat } from "@/components/DocumentChat";
  * missing or the migration has not been run yet. A server fetch here would
  * turn a setup mistake into a build-time or render-time crash.
  */
-export default function Page() {
+const Page = () => {
   return <DocumentChat />;
-}
+};
+
+export default Page;

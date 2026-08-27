@@ -41,7 +41,7 @@ interface DocumentRow {
   created_at: string;
 }
 
-function toDocument(row: DocumentRow): DocumentSummary {
+const toDocument = (row: DocumentRow): DocumentSummary => {
   return {
     id: row.id,
     filename: row.filename,
@@ -54,14 +54,14 @@ function toDocument(row: DocumentRow): DocumentSummary {
     status: row.status,
     createdAt: new Date(row.created_at).toISOString(),
   };
-}
+};
 
-export async function createDocument(input: {
+export const createDocument = async (input: {
   filename: string;
   kind: DocumentKind;
   mimeType: string;
   sizeBytes: number;
-}): Promise<string> {
+}): Promise<string> => {
   const id = randomUUID();
   await execute(
     `INSERT INTO documents (id, filename, kind, mime_type, size_bytes, status)
@@ -69,36 +69,36 @@ export async function createDocument(input: {
     [id, input.filename, input.kind, input.mimeType, input.sizeBytes],
   );
   return id;
-}
+};
 
-export async function markDocumentReady(
+export const markDocumentReady = async (
   documentId: string,
   counts: { pageCount: number | null; lineCount: number | null; chunkCount: number },
-): Promise<void> {
+): Promise<void> => {
   await execute(
     `UPDATE documents
         SET status = 'ready', page_count = $2, line_count = $3, chunk_count = $4
       WHERE id = $1`,
     [documentId, counts.pageCount, counts.lineCount, counts.chunkCount],
   );
-}
+};
 
-export async function markDocumentFailed(
+export const markDocumentFailed = async (
   documentId: string,
   message: string,
-): Promise<void> {
+): Promise<void> => {
   await execute(
     `UPDATE documents SET status = 'failed', error_message = $2 WHERE id = $1`,
     [documentId, message],
   );
-}
+};
 
 /**
  * The document the app is currently grounded in: the most recent one that
  * finished indexing. "Replace" simply indexes a newer document, which then
  * wins here — and brings its own chat with it.
  */
-export async function getCurrentDocument(): Promise<DocumentSummary | null> {
+export const getCurrentDocument = async (): Promise<DocumentSummary | null> => {
   const rows = await query<DocumentRow>(
     `SELECT id, filename, kind, mime_type, size_bytes, page_count, line_count,
             chunk_count, status, created_at
@@ -108,9 +108,9 @@ export async function getCurrentDocument(): Promise<DocumentSummary | null> {
       LIMIT 1`,
   );
   return rows[0] ? toDocument(rows[0]) : null;
-}
+};
 
-export async function getDocument(id: string): Promise<DocumentSummary | null> {
+export const getDocument = async (id: string): Promise<DocumentSummary | null> => {
   const rows = await query<DocumentRow>(
     `SELECT id, filename, kind, mime_type, size_bytes, page_count, line_count,
             chunk_count, status, created_at
@@ -118,7 +118,7 @@ export async function getDocument(id: string): Promise<DocumentSummary | null> {
     [id],
   );
   return rows[0] ? toDocument(rows[0]) : null;
-}
+};
 
 /* ── chunks + embeddings ───────────────────────────────────────────────── */
 
@@ -135,7 +135,7 @@ interface ChunkRow {
   text: string;
 }
 
-function toChunk(row: ChunkRow): ChunkRecord {
+const toChunk = (row: ChunkRow): ChunkRecord => {
   const base = {
     sectionOrdinal: row.section_ordinal,
     sectionLabel: row.section_label,
@@ -153,7 +153,7 @@ function toChunk(row: ChunkRow): ChunkRecord {
     text: row.text,
     where: chunkWhere(base),
   };
-}
+};
 
 /**
  * Write chunks and their vectors.
@@ -161,11 +161,11 @@ function toChunk(row: ChunkRow): ChunkRecord {
  * Batched rather than row-at-a-time: the Neon HTTP driver does one round trip
  * per statement, so a 200-chunk document would otherwise be 400 round trips.
  */
-export async function insertChunksWithEmbeddings(
+export const insertChunksWithEmbeddings = async (
   documentId: string,
   prepared: readonly PreparedChunk[],
   vectors: readonly number[][],
-): Promise<void> {
+): Promise<void> => {
   const BATCH = 40;
 
   for (let offset = 0; offset < prepared.length; offset += BATCH) {
@@ -215,9 +215,9 @@ export async function insertChunksWithEmbeddings(
       embeddingValues,
     );
   }
-}
+};
 
-export async function getChunks(documentId: string): Promise<ChunkRecord[]> {
+export const getChunks = async (documentId: string): Promise<ChunkRecord[]> => {
   const rows = await query<ChunkRow>(
     `SELECT id, document_id, ordinal, section_ordinal, section_label, page,
             line_start, line_end, token_count, text
@@ -225,10 +225,10 @@ export async function getChunks(documentId: string): Promise<ChunkRecord[]> {
     [documentId],
   );
   return rows.map(toChunk);
-}
+};
 
 /** The Outline tab, derived from the chunks' section columns. */
-export function buildOutline(chunks: readonly ChunkRecord[]): OutlineSection[] {
+export const buildOutline = (chunks: readonly ChunkRecord[]): OutlineSection[] => {
   const sections = new Map<number, OutlineSection>();
 
   for (const chunk of chunks) {
@@ -248,17 +248,17 @@ export function buildOutline(chunks: readonly ChunkRecord[]): OutlineSection[] {
   }
 
   return [...sections.values()].sort((a, b) => a.ordinal - b.ordinal);
-}
+};
 
-function initialRange(chunk: ChunkRecord): string {
+const initialRange = (chunk: ChunkRecord): string => {
   if (chunk.page !== null) return `p.${chunk.page}`;
   if (chunk.lineStart !== null && chunk.lineEnd !== null) {
     return `L${chunk.lineStart}–${chunk.lineEnd}`;
   }
   return "";
-}
+};
 
-function extendRange(range: string, chunk: ChunkRecord): string {
+const extendRange = (range: string, chunk: ChunkRecord): string => {
   if (chunk.page !== null) {
     const start = /^p\.(\d+)/.exec(range)?.[1];
     return start && Number(start) !== chunk.page
@@ -268,7 +268,7 @@ function extendRange(range: string, chunk: ChunkRecord): string {
   const match = /^L(\d+)–(\d+)$/.exec(range);
   if (!match || chunk.lineEnd === null) return range;
   return `L${match[1]}–${Math.max(Number(match[2]), chunk.lineEnd)}`;
-}
+};
 
 /* ── chats + messages ──────────────────────────────────────────────────── */
 
@@ -277,7 +277,7 @@ function extendRange(range: string, chunk: ChunkRecord): string {
  * makes a browser reload restore the thread — there is no session cookie and
  * no client-side copy of the history.
  */
-export async function getOrCreateChat(documentId: string): Promise<string> {
+export const getOrCreateChat = async (documentId: string): Promise<string> => {
   const existing = await query<{ id: string }>(
     `SELECT id FROM chats WHERE document_id = $1`,
     [documentId],
@@ -292,7 +292,7 @@ export async function getOrCreateChat(documentId: string): Promise<string> {
     [id, documentId],
   );
   return created[0]?.id ?? id;
-}
+};
 
 interface MessageRow {
   id: string;
@@ -304,7 +304,7 @@ interface MessageRow {
   ui_state: unknown;
 }
 
-function toMessage(row: MessageRow): StoredMessage {
+const toMessage = (row: MessageRow): StoredMessage => {
   const citations = citationSchema.array().safeParse(row.citations);
   const retrieval = retrievalMetaSchema.safeParse(row.retrieval);
   const uiState = messageUiStateSchema.safeParse(row.ui_state);
@@ -318,9 +318,9 @@ function toMessage(row: MessageRow): StoredMessage {
     retrieval: retrieval.success ? retrieval.data : null,
     uiState: uiState.success ? uiState.data : EMPTY_UI_STATE,
   };
-}
+};
 
-export async function getMessages(chatId: string): Promise<StoredMessage[]> {
+export const getMessages = async (chatId: string): Promise<StoredMessage[]> => {
   const rows = await query<MessageRow>(
     `SELECT id, role, content, structured, citations, retrieval, ui_state
        FROM messages
@@ -329,9 +329,9 @@ export async function getMessages(chatId: string): Promise<StoredMessage[]> {
     [chatId],
   );
   return rows.map(toMessage);
-}
+};
 
-export async function insertMessage(input: {
+export const insertMessage = async (input: {
   id: string;
   chatId: string;
   role: "user" | "assistant";
@@ -339,7 +339,7 @@ export async function insertMessage(input: {
   structured?: unknown;
   citations?: readonly Citation[];
   retrieval?: RetrievalMeta | null;
-}): Promise<void> {
+}): Promise<void> => {
   await execute(
     `INSERT INTO messages (id, chat_id, role, content, structured, citations, retrieval, ui_state)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -361,14 +361,14 @@ export async function insertMessage(input: {
       JSON.stringify(EMPTY_UI_STATE),
     ],
   );
-}
+};
 
-export async function updateMessageUiState(
+export const updateMessageUiState = async (
   messageId: string,
   uiState: MessageUiState,
-): Promise<void> {
+): Promise<void> => {
   await execute(`UPDATE messages SET ui_state = $2 WHERE id = $1`, [
     messageId,
     JSON.stringify(uiState),
   ]);
-}
+};

@@ -81,7 +81,7 @@ export class ApiError extends Error {
   }
 }
 
-function defaultStatusFor(code: ErrorCode): number {
+const defaultStatusFor = (code: ErrorCode): number => {
   switch (code) {
     case "ERR_UNSUPPORTED_TYPE":
       // 415: the request was well-formed, the media type is not supported.
@@ -103,13 +103,13 @@ function defaultStatusFor(code: ErrorCode): number {
     case "ERR_INTERNAL":
       return 500;
   }
-}
+};
 
 /**
  * Turn anything thrown inside a route handler into a JSON error response.
  * Unknown errors are logged in full but reported opaquely.
  */
-export function toErrorResponse(error: unknown): Response {
+export const toErrorResponse = (error: unknown): Response => {
   if (error instanceof ApiError) {
     if (error.status >= 500) console.error(`[${error.code}]`, error);
     return error.toResponse();
@@ -118,14 +118,14 @@ export function toErrorResponse(error: unknown): Response {
   return new ApiError("ERR_INTERNAL", "Something went wrong on the server.", {
     detail: error instanceof Error ? error.message : String(error),
   }).toResponse();
-}
+};
 
 /** The message the "Unsupported file" card shows, per spec §3h. */
-export function unsupportedFileError(filename: string, extension: string): ApiError {
+export const unsupportedFileError = (filename: string, extension: string): ApiError => {
   const shown = extension ? extension.toUpperCase() : "unrecognised";
   return new ApiError(
     "ERR_UNSUPPORTED_TYPE",
     `"${filename}" is a ${shown} file. This app reads PDF, TXT and Markdown.`,
     { detail: "nothing was written to Neon" },
   );
-}
+};

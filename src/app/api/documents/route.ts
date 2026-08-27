@@ -35,7 +35,7 @@ const STAGES = [
   "Writing to Neon",
 ] as const;
 
-export async function POST(request: Request): Promise<Response> {
+export const POST = async (request: Request): Promise<Response> => {
   let form: FormData;
   try {
     form = await request.formData();
@@ -177,9 +177,9 @@ export async function POST(request: Request): Promise<Response> {
       "X-Accel-Buffering": "no",
     },
   });
-}
+};
 
-function inferMime(kind: "pdf" | "txt" | "md"): string {
+const inferMime = (kind: "pdf" | "txt" | "md"): string => {
   switch (kind) {
     case "pdf":
       return "application/pdf";
@@ -188,4 +188,4 @@ function inferMime(kind: "pdf" | "txt" | "md"): string {
     case "md":
       return "text/markdown";
   }
-}
+};

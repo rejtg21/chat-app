@@ -19,7 +19,7 @@ const bodySchema = z.object({
   uiState: messageUiStateSchema,
 });
 
-export async function POST(request: Request): Promise<Response> {
+export const POST = async (request: Request): Promise<Response> => {
   try {
     const parsed = bodySchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -33,4 +33,4 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     return toErrorResponse(error);
   }
-}
+};

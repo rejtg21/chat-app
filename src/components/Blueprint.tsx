@@ -8,7 +8,7 @@ import type { CSSProperties, ReactNode } from "react";
  * element wears all four, and dropping them is called out explicitly in its
  * guide. Wrapping them here means no call site can forget.
  */
-export function Corners() {
+export const Corners = () => {
   return (
     <>
       <i className="corner tl" />
@@ -17,7 +17,7 @@ export function Corners() {
       <i className="corner br" />
     </>
   );
-}
+};
 
 interface BlueprintProps {
   children: ReactNode;
@@ -25,11 +25,11 @@ interface BlueprintProps {
   className?: string;
 }
 
-export function Blueprint({ children, style, className }: BlueprintProps) {
+export const Blueprint = ({ children, style, className }: BlueprintProps) => {
   return (
     <div className={className ? `blueprint ${className}` : "blueprint"} style={style}>
       <Corners />
       {children}
     </div>
   );
-}
+};

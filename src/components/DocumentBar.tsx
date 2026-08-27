@@ -2,7 +2,7 @@ import { documentMeta } from "@/lib/format";
 import type { DocumentSummary } from "@/lib/types";
 
 /** 2. The "Grounded in <file>" bar, shown once a document is indexed. */
-export function DocumentBar({
+export const DocumentBar = ({
   document,
   onReplace,
   onToggleSource,
@@ -11,7 +11,7 @@ export function DocumentBar({
   onReplace: () => void;
   /** Only supplied below the breakpoint, where the source pane is a slide-over. */
   onToggleSource?: () => void;
-}) {
+}) => {
   return (
     <div
       style={{
@@ -75,4 +75,4 @@ export function DocumentBar({
       </button>
     </div>
   );
-}
+};

@@ -3,7 +3,7 @@ import { Blueprint } from "@/components/Blueprint";
 import { DB_LABEL } from "@/lib/config";
 
 /** 3a. No document loaded. */
-export function EmptyState({
+export const EmptyState = ({
   onUpload,
   onUseSample,
   busy,
@@ -11,7 +11,7 @@ export function EmptyState({
   onUpload: () => void;
   onUseSample: () => void;
   busy: boolean;
-}) {
+}) => {
   return (
     <Blueprint
       style={{
@@ -73,4 +73,4 @@ export function EmptyState({
       </p>
     </Blueprint>
   );
-}
+};

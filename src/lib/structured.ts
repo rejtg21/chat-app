@@ -168,7 +168,7 @@ export type RenderablePayload = z.infer<typeof renderablePayloadSchema>;
  * Returns null when the payload does not validate — the caller then shows
  * prose only, which is the documented fallback.
  */
-export function parseRenderablePayload(value: unknown): RenderablePayload | null {
+export const parseRenderablePayload = (value: unknown): RenderablePayload | null => {
   const result = renderablePayloadSchema.safeParse(value);
   return result.success ? result.data : null;
-}
+};

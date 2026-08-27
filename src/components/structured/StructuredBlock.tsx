@@ -17,7 +17,7 @@ import type { MessageUiState } from "@/lib/types";
  * longer understands. Anything that fails returns null and the message keeps
  * its prose — the documented fallback, and always a correct rendering.
  */
-export function StructuredBlock({
+export const StructuredBlock = ({
   payload,
   uiState,
   onToggleChecklistItem,
@@ -29,7 +29,7 @@ export function StructuredBlock({
   onToggleChecklistItem: (index: number) => void;
   onToggleEvidenceCard: (index: number) => void;
   onOpenInSource: (chunkId: string) => void;
-}) {
+}) => {
   const parsed = parseRenderablePayload(payload);
   if (!parsed) return null;
 
@@ -58,4 +58,4 @@ export function StructuredBlock({
         />
       );
   }
-}
+};

@@ -38,11 +38,11 @@ interface ScoredRow {
  * weakly: a low-scoring passage in the prompt is what produces a confident
  * answer about something the document does not say.
  */
-export async function retrieve(
+export const retrieve = async (
   documentId: string,
   question: string,
   totalChunks: number,
-): Promise<RetrievalResult> {
+): Promise<RetrievalResult> => {
   const vector = await embedText(question);
 
   let rows: ScoredRow[];
@@ -99,7 +99,7 @@ export async function retrieve(
       notFound: chunks.length === 0,
     },
   };
-}
+};
 
 /**
  * Render the retrieved chunks as the numbered source list the model sees.
@@ -107,11 +107,11 @@ export async function retrieve(
  * The number is the model's only handle on a passage. It never sees, and so
  * can never repeat, a filename or a line range.
  */
-export function formatSources(chunks: readonly RetrievedChunk[]): string {
+export const formatSources = (chunks: readonly RetrievedChunk[]): string => {
   return chunks
     .map((chunk, index) => `[${index + 1}] (${chunk.label})\n${chunk.text}`)
     .join("\n\n");
-}
+};
 
 /**
  * Resolve the `[n]` markers the model actually wrote into citations.
@@ -122,11 +122,11 @@ export function formatSources(chunks: readonly RetrievedChunk[]): string {
  * refers to a chunk that does not exist, and is dropped silently rather than
  * rendered as a plausible-looking citation.
  */
-export function resolveCitations(
+export const resolveCitations = (
   answer: string,
   chunks: readonly RetrievedChunk[],
   filename: string,
-): Citation[] {
+): Citation[] => {
   const markers = [...answer.matchAll(/\[(\d{1,2})\]/g)].map((match) =>
     Number(match[1]),
   );
@@ -150,14 +150,14 @@ export function resolveCitations(
   }
 
   return citations.sort((a, b) => a.n - b.n);
-}
+};
 
 /** Look a chunk up by the id the model named, for evidence cards. */
-export function findByChunkId(
+export const findByChunkId = (
   chunks: readonly RetrievedChunk[],
   chunkId: string,
-): RetrievedChunk | null {
+): RetrievedChunk | null => {
   return (
     chunks.find((chunk) => chunk.id === chunkId || chunk.label === chunkId) ?? null
   );
-}
+};

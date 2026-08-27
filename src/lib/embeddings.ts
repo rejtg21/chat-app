@@ -27,7 +27,7 @@ import { ApiError } from "@/lib/errors";
 
 let pipelinePromise: Promise<FeatureExtractionPipeline> | null = null;
 
-function getPipeline(): Promise<FeatureExtractionPipeline> {
+const getPipeline = (): Promise<FeatureExtractionPipeline> => {
   if (!pipelinePromise) {
     pipelinePromise = pipeline("feature-extraction", EMBEDDING_MODEL).catch(
       (cause: unknown) => {
@@ -46,9 +46,9 @@ function getPipeline(): Promise<FeatureExtractionPipeline> {
     );
   }
   return pipelinePromise;
-}
+};
 
-function assertWidth(vector: number[]): number[] {
+const assertWidth = (vector: number[]): number[] => {
   if (vector.length !== EMBEDDING_DIMENSIONS) {
     throw new ApiError(
       "ERR_EMBEDDING_FAILED",
@@ -59,13 +59,13 @@ function assertWidth(vector: number[]): number[] {
     );
   }
   return vector;
-}
+};
 
 /**
  * Embed a batch of texts. Vectors come back mean-pooled and L2-normalised,
  * so a cosine comparison in pgvector is just `1 - (a <=> b)`.
  */
-export async function embedTexts(texts: readonly string[]): Promise<number[][]> {
+export const embedTexts = async (texts: readonly string[]): Promise<number[][]> => {
   if (texts.length === 0) return [];
 
   const extractor = await getPipeline();
@@ -88,13 +88,13 @@ export async function embedTexts(texts: readonly string[]): Promise<number[][]> 
   return texts.map((_, index) =>
     assertWidth(flat.slice(index * width, (index + 1) * width)),
   );
-}
+};
 
 /** Embed one text — the query side of retrieval. */
-export async function embedText(text: string): Promise<number[]> {
+export const embedText = async (text: string): Promise<number[]> => {
   const [vector] = await embedTexts([text]);
   if (!vector) {
     throw new ApiError("ERR_EMBEDDING_FAILED", "The query could not be embedded.");
   }
   return vector;
-}
+};

@@ -53,11 +53,11 @@ interface RawSection {
  * keeping the prompt inside a sane budget; this deliberately avoids pulling
  * in a tokeniser for a number that is only ever displayed and bounded.
  */
-export function estimateTokens(text: string): number {
+export const estimateTokens = (text: string): number => {
   return Math.max(1, Math.round(text.trim().length / 4));
-}
+};
 
-export function chunkDocument(extraction: Extraction): ChunkingResult {
+export const chunkDocument = (extraction: Extraction): ChunkingResult => {
   const raw =
     extraction.kind === "pdf"
       ? sectionsFromPages(extraction)
@@ -122,10 +122,10 @@ export function chunkDocument(extraction: Extraction): ChunkingResult {
   }
 
   return { chunks, sections };
-}
+};
 
 /** Markdown/text: split on ATX headings, keeping absolute line numbers. */
-function sectionsFromHeadings(text: string): RawSection[] {
+const sectionsFromHeadings = (text: string): RawSection[] => {
   const lines = text.split("\n");
   const headingAt = new Map<number, string>();
 
@@ -184,10 +184,10 @@ function sectionsFromHeadings(text: string): RawSection[] {
   });
 
   return sections.filter((section) => section.text.trim().length > 0);
-}
+};
 
 /** PDF: one section per page, titled by the page's first non-empty line. */
-function sectionsFromPages(extraction: Extraction): RawSection[] {
+const sectionsFromPages = (extraction: Extraction): RawSection[] => {
   return extraction.pages
     .filter((page) => page.text.trim().length > 0)
     .map((page) => {
@@ -208,7 +208,7 @@ function sectionsFromPages(extraction: Extraction): RawSection[] {
         text: page.text,
       };
     });
-}
+};
 
 interface Piece {
   text: string;
@@ -223,7 +223,7 @@ interface Piece {
  * The overlap is what stops a fact that straddles a boundary from becoming
  * unretrievable.
  */
-function splitWithOverlap(text: string): Piece[] {
+const splitWithOverlap = (text: string): Piece[] => {
   if (text.trim().length <= CHUNK_TARGET_CHARS) {
     return [{ text, lineOffset: 0 }];
   }
@@ -254,7 +254,7 @@ function splitWithOverlap(text: string): Piece[] {
   flush();
 
   return pieces;
-}
+};
 
 interface Unit {
   text: string;
@@ -262,7 +262,7 @@ interface Unit {
 }
 
 /** Paragraphs, or sentences when a paragraph exceeds the chunk target. */
-function splitIntoUnits(text: string): Unit[] {
+const splitIntoUnits = (text: string): Unit[] => {
   const units: Unit[] = [];
   const lines = text.split("\n");
 
@@ -297,11 +297,11 @@ function splitIntoUnits(text: string): Unit[] {
   push();
 
   return units;
-}
+};
 
-function countLines(text: string): number {
+const countLines = (text: string): number => {
   return text.split("\n").length;
-}
+};
 
 /**
  * Strip a heading's own numbering ("3 Engagement by format", "3. Methods").
@@ -311,9 +311,9 @@ function countLines(text: string): number {
  * a heading like "2024 in review" keeps its number, since dropping it would
  * change what the heading says.
  */
-function cleanHeading(title: string): string {
+const cleanHeading = (title: string): string => {
   const match = /^(\d{1,2})[.)]?\s+(\S.*)$/.exec(title);
   if (!match) return title;
   // A four-digit year, or anything that reads as part of the title, stays.
   return match[2];
-}
+};

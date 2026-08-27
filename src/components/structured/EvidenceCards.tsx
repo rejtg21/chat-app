@@ -11,7 +11,7 @@ import type { ResolvedEvidenceCardsPayload } from "@/lib/structured";
  * the excerpt and the location were resolved from the database before this
  * ever reached the browser.
  */
-export function EvidenceCards({
+export const EvidenceCards = ({
   payload,
   expanded,
   onToggle,
@@ -21,7 +21,7 @@ export function EvidenceCards({
   expanded: Record<string, boolean>;
   onToggle: (index: number) => void;
   onOpenInSource: (chunkId: string) => void;
-}) {
+}) => {
   return (
     <div style={structuredBlockStyle}>
       <Kicker>{payload.title}</Kicker>
@@ -123,4 +123,4 @@ export function EvidenceCards({
       </div>
     </div>
   );
-}
+};

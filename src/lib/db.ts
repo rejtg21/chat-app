@@ -22,7 +22,7 @@ import { EMBEDDING_DIMENSIONS } from "@/lib/config";
  */
 const globalForPg = globalThis as unknown as { docdeskPool?: Pool };
 
-export function getPool(): Pool {
+export const getPool = (): Pool => {
   if (globalForPg.docdeskPool) return globalForPg.docdeskPool;
 
   const connectionString = process.env.DATABASE_URL;
@@ -50,9 +50,9 @@ export function getPool(): Pool {
 
   globalForPg.docdeskPool = pool;
   return pool;
-}
+};
 
-function needsTls(connectionString: string): boolean {
+const needsTls = (connectionString: string): boolean => {
   try {
     const url = new URL(connectionString);
     if (url.searchParams.get("sslmode") === "disable") return false;
@@ -62,7 +62,7 @@ function needsTls(connectionString: string): boolean {
   } catch {
     return true;
   }
-}
+};
 
 /**
  * Run a parameterised query and name its row shape.
@@ -71,15 +71,15 @@ function needsTls(connectionString: string): boolean {
  * cannot know the column types, so the call site asserts them. Keep the type
  * argument in step with the SELECT list.
  */
-export async function query<T>(text: string, params: unknown[] = []): Promise<T[]> {
+export const query = async <T>(text: string, params: unknown[] = []): Promise<T[]> => {
   const result = await getPool().query(text, params as unknown[]);
   return result.rows as unknown as T[];
-}
+};
 
 /** Run a statement whose result is not read. */
-export async function execute(text: string, params: unknown[] = []): Promise<void> {
+export const execute = async (text: string, params: unknown[] = []): Promise<void> => {
   await getPool().query(text, params as unknown[]);
-}
+};
 
 /**
  * pgvector's text input format: `[0.1,0.2,...]`.
@@ -87,7 +87,7 @@ export async function execute(text: string, params: unknown[] = []): Promise<voi
  * Bind it as a normal text parameter and cast in SQL with `$n::vector` —
  * there is no native vector codec.
  */
-export function toVectorLiteral(vector: readonly number[]): string {
+export const toVectorLiteral = (vector: readonly number[]): string => {
   if (vector.length !== EMBEDDING_DIMENSIONS) {
     throw new ApiError(
       "ERR_EMBEDDING_FAILED",
@@ -98,10 +98,10 @@ export function toVectorLiteral(vector: readonly number[]): string {
     );
   }
   return `[${vector.join(",")}]`;
-}
+};
 
 /** Wrap a driver-level failure in the retrieval error the UI can render. */
-export function asRetrievalError(cause: unknown): ApiError {
+export const asRetrievalError = (cause: unknown): ApiError => {
   return new ApiError(
     "ERR_RETRIEVAL_FAILED",
     "The vector search did not come back. Your document and this conversation are safe in Neon — only the lookup failed.",
@@ -112,4 +112,4 @@ export function asRetrievalError(cause: unknown): ApiError {
       cause,
     },
   );
-}
+};

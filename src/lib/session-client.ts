@@ -14,7 +14,7 @@ import type { StoredMessage } from "@/lib/types";
  * alternative — a second renderer for "historical" messages — is how the two
  * drift until a reload quietly looks different from the session that made it.
  */
-export function toUIMessage(message: StoredMessage): ChatUIMessage {
+export const toUIMessage = (message: StoredMessage): ChatUIMessage => {
   if (message.role === "user") {
     return {
       id: message.id,
@@ -50,10 +50,10 @@ export function toUIMessage(message: StoredMessage): ChatUIMessage {
   }
 
   return { id: message.id, role: "assistant", parts };
-}
+};
 
 /** Pull the typed data parts back out of a message for rendering. */
-export function readDataParts(message: ChatUIMessage) {
+export const readDataParts = (message: ChatUIMessage) => {
   let retrieval: Extract<
     ChatUIMessage["parts"][number],
     { type: "data-retrieval" }
@@ -73,4 +73,4 @@ export function readDataParts(message: ChatUIMessage) {
   }
 
   return { text, retrieval, citations, structured };
-}
+};

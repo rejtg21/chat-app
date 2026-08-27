@@ -40,7 +40,7 @@ const EMPTY_SESSION: SessionPayload = {
   messages: [],
 };
 
-export function DocumentChat() {
+export const DocumentChat = () => {
   const [session, setSession] = useState<SessionPayload>(EMPTY_SESSION);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -512,12 +512,12 @@ export function DocumentChat() {
       />
     </div>
   );
-}
+};
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
 /** Consume the indexing route's newline-delimited JSON. */
-async function* readNdjson(
+const readNdjson = async function* (
   body: ReadableStream<Uint8Array>,
 ): AsyncGenerator<IndexingEvent> {
   const reader = body.getReader();
@@ -540,14 +540,14 @@ async function* readNdjson(
 
   const tail = buffer.trim();
   if (tail) yield JSON.parse(tail) as IndexingEvent;
-}
+};
 
 /**
  * The chat transport surfaces a failed response as an Error carrying the
  * response body. Recover the structured error so the retrieval failure gets
  * its own card and its own code line rather than a generic message.
  */
-function parseRetrievalError(error: Error | undefined): AppError | null {
+const parseRetrievalError = (error: Error | undefined): AppError | null => {
   if (!error) return null;
 
   try {
@@ -570,10 +570,10 @@ function parseRetrievalError(error: Error | undefined): AppError | null {
     message: `The vector search did not come back. Your document and this conversation are safe in ${DB_LABEL} — only the lookup failed.`,
     code: `ERR_RETRIEVAL_FAILED · ${error.message}`,
   };
-}
+};
 
 /** Matches the handoff's ~1100px breakpoint. */
-function useNarrowViewport(): boolean {
+const useNarrowViewport = (): boolean => {
   const [narrow, setNarrow] = useState(false);
 
   useEffect(() => {
@@ -585,15 +585,15 @@ function useNarrowViewport(): boolean {
   }, []);
 
   return narrow;
-}
+};
 
-function SlideOver({
+const SlideOver = ({
   children,
   onClose,
 }: {
   children: React.ReactNode;
   onClose: () => void;
-}) {
+}) => {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -631,10 +631,10 @@ function SlideOver({
       </div>
     </div>
   );
-}
+};
 
 /** Loading state for the thread while the session is read back. */
-function ThreadSkeleton() {
+const ThreadSkeleton = () => {
   return (
     <div
       style={{
@@ -650,4 +650,4 @@ function ThreadSkeleton() {
       ))}
     </div>
   );
-}
+};
