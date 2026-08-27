@@ -135,17 +135,8 @@ and consumed as CSS custom properties.
 
 Known gaps, roughly in priority order:
 
-- **Test scripts.** There is no `pnpm test`, no test files and no CI. The
-  parts that most want coverage: the two-sided schema validation and
-  plain-prose fallback in `src/lib/structured.ts`, citation resolution and
-  the "marker outside the retrieved set is dropped" rule in
-  `src/lib/retrieval.ts`, chunking on section boundaries in
-  `src/lib/chunk.ts`, and `src/lib/errors.ts` — the rate-limit / 5xx / 4xx
-  classifier and the guarantee that no raw provider text reaches the client.
-- **API auth and in-app rate limiting.** Every route is open. The error copy
-  speaks of a per-agent request limit, but enforcement lives upstream at the
-  AI Gateway, not in this app.
-- **Retry/backoff on transient model errors.** A rate-limited or dropped
-  answer surfaces an error card immediately; there is no automatic retry.
-- **Observability.** Failures are `console.error` only — no structured logs,
-  no error reporting sink.
+- **Solidify validation and guardrails.** The structured-output pipeline currently relies too heavily on model compliance. The classifier and component builder need stricter schema validation and explicit guardrails at each boundary: validate the classifier output against the allowed component types, validate every builder payload against its component schema, reject unsupported or malformed fields, enforce source/chunk provenance for evidence cards, prevent unsupported values or hallucinated data from entering structured components, and fall back safely to the original plain-prose answer whenever validation fails. Validation should happen both before and after model output is processed so malformed model responses never reach the client.
+- **Test scripts.** There is no `pnpm test`, no test files and no CI. The parts that most want coverage: the two-sided schema validation and plain-prose fallback in `src/lib/structured.ts`, citation resolution and the "marker outside the retrieved set is dropped" rule in `src/lib/retrieval.ts`, chunking on section boundaries in `src/lib/chunk.ts`, and `src/lib/errors.ts` — the rate-limit / 5xx / 4xx classifier and the guarantee that no raw provider text reaches the client. Tests should also cover the new validation/guardrail rules, including malformed classifier output, invalid component payloads, unsupported fields, missing required fields, invalid `chunkId` values, unsupported evidence, and fallback behavior.
+- **In-app rate limiting.** Every route is open. The error copy speaks of a per-agent request limit, but enforcement lives upstream at the AI Gateway, not in this app.
+- **Retry/backoff on transient model errors.** A rate-limited or dropped answer surfaces an error card immediately; there is no automatic retry.
+- **Observability.** Failures are `console.error` only — no structured logs, no error reporting sink.
