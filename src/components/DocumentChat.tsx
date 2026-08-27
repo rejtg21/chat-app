@@ -8,6 +8,7 @@ import { DocumentBar } from "@/components/DocumentBar";
 import { EmptyState } from "@/components/EmptyState";
 import { Suggestions } from "@/components/Suggestions";
 import { Composer } from "@/components/Composer";
+import { FileDropZone } from "@/components/FileDropZone";
 import { AnswerMessage } from "@/components/AnswerMessage";
 import {
   ErrorCard,
@@ -452,6 +453,16 @@ export const DocumentChat = () => {
             borderRight: narrow ? "none" : "1px solid var(--color-divider)",
           }}
         >
+          <FileDropZone
+            onDropFile={(file) => void indexFile(file)}
+            disabled={Boolean(upload)}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
           {document ? (
             <DocumentBar
               document={document}
@@ -592,6 +603,7 @@ export const DocumentChat = () => {
             filename={document?.filename ?? null}
             busy={busy}
           />
+          </FileDropZone>
         </section>
 
         {narrow ? (
