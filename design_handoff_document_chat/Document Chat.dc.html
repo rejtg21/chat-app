@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-3351db78-3734-4f7a-a50e-39a1fc39e681/styles.css">
+<script src="_ds/industry-3351db78-3734-4f7a-a50e-39a1fc39e681/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&amp;family=Barlow+Condensed:wght@500;600;700&amp;display=swap">
+<style>
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; }
+a { color: var(--color-accent-700); }
+a:hover { color: var(--color-accent-900); }
+@keyframes sh { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: var(--color-neutral-400); }
+::-webkit-scrollbar-track { background: transparent; }
+</style>
+</helmet>
+<div style="height: 100dvh; max-height: 100dvh; overflow: hidden; display: flex; flex-direction: column; font-family: var(--font-body); background: var(--color-bg); color: var(--color-text);">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--color-divider); flex: none;">
+    <div style="display: flex; align-items: baseline; gap: var(--space-3);">
+      <span style="font-family: var(--font-heading); font-weight: 700; font-size: 19px; letter-spacing: 0.02em; text-transform: uppercase;">Docdesk</span>
+      <span style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-neutral-600);">Document chat</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: var(--space-4);">
+      <div style="display: flex; align-items: center; gap: 7px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-700);">
+        <span style="width: 6px; height: 6px; background: var(--color-accent); display: block;"></span>
+        <span>{{ dbLabel }} · {{ syncLabel }}</span>
+      </div>
+      <sc-if value="{{ showDemo }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; align-items: center; gap: var(--space-2); padding-left: var(--space-4); border-left: 1px solid var(--color-divider);">
+          <span style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-500);">Demo</span>
+          <button class="btn btn-secondary" style="height: 28px; font-size: 12px;" onClick="{{ onBadFile }}">Bad file</button>
+          <button class="btn btn-secondary" style="height: 28px; font-size: 12px; border-color: {{ errBorder }};" onClick="{{ onToggleError }}">Retrieval error</button>
+          <button class="btn btn-ghost" style="height: 28px; font-size: 12px;" onClick="{{ onReset }}">Reset</button>
+        </div>
+      </sc-if>
+    </div>
+  </header>
+
+  <main style="flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: {{ gridCols }}; grid-template-rows: minmax(0, 1fr); align-items: stretch;">
+
+    <section data-screen-label="Chat" style="min-width: 0; min-height: 0; height: 100%; overflow: hidden; display: flex; flex-direction: column; border-right: 1px solid var(--color-divider);">
+
+      <sc-if value="{{ hasDoc }}" hint-placeholder-val="{{ true }}">
+        <div style="flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--color-divider);">
+          <span style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent);">Grounded in</span>
+          <span style="font-family: var(--font-heading); font-size: 16px;">{{ docName }}</span>
+          <span style="font-size: 11px; color: var(--color-neutral-600);">{{ docMeta }}</span>
+          <span style="flex: 1;"></span>
+          <button class="btn btn-ghost" style="height: 28px; font-size: 12px;" onClick="{{ onPickFile }}">Replace</button>
+        </div>
+      </sc-if>
+
+      <div id="chat-scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8) var(--space-6);">
+
+        <sc-if value="{{ noDoc }}" hint-placeholder-val="{{ false }}">
+          <div class="blueprint" style="max-width: 520px; margin: var(--space-8) auto; padding: var(--space-8); text-align: center;">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" style="margin: 0 auto var(--space-4);">
+              <path d="M12 16V4"></path><path d="M7 9l5-5 5 5"></path><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"></path>
+            </svg>
+            <h2 style="margin: 0 0 var(--space-2); font-size: 26px;">No document loaded</h2>
+            <p style="margin: 0 auto var(--space-6); max-width: 340px; font-size: 14px; color: var(--color-neutral-700);">Upload a PDF, TXT or Markdown file. It is parsed, chunked, embedded and stored in {{ dbLabel }}, so this conversation survives a reload.</p>
+            <div style="display: flex; gap: var(--space-3); justify-content: center;">
+              <button class="btn btn-primary" onClick="{{ onPickFile }}">Upload document</button>
+              <button class="btn btn-secondary" onClick="{{ onSample }}">Use the sample</button>
+            </div>
+            <p style="margin: var(--space-6) 0 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">PDF · TXT · MD — up to 20 MB</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ showSuggestions }}" hint-placeholder-val="{{ false }}">
+          <div style="max-width: 660px; margin: 0 auto;">
+            <h2 style="margin: 0 0 var(--space-2); font-size: 24px;">Ask about {{ docName }}</h2>
+            <p style="margin: 0 0 var(--space-6); font-size: 14px; color: var(--color-neutral-700);">{{ chunkCount }} chunks indexed · answers cite the section and lines they came from.</p>
+            <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+              <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="4">
+                <button class="blueprint" style="display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-3) var(--space-4); background: transparent; font: inherit; font-size: 14px; text-align: left; cursor: pointer; color: inherit;" style-hover="background: color-mix(in srgb, var(--color-accent) 8%, transparent); border-color: var(--color-accent);" onClick="{{ s.onClick }}">
+                  <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                  <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); min-width: 74px;">{{ s.kind }}</span>
+                  <span>{{ s.q }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="max-width: 660px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-8);">
+          <sc-for list="{{ view }}" as="m" hint-placeholder-count="0">
+            <div>
+
+              <sc-if value="{{ m.isUser }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; justify-content: flex-end;">
+                  <div style="max-width: 78%; padding: var(--space-3) var(--space-4); background: var(--color-accent-900); color: var(--color-bg); font-size: 14px; line-height: 1.5;">{{ m.text }}</div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ m.isNote }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; align-items: center; gap: var(--space-3); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-600);">
+                  <span style="height: 1px; flex: 1; background: var(--color-divider);"></span>
+                  <span>{{ m.text }}</span>
+                  <span style="height: 1px; flex: 1; background: var(--color-divider);"></span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ m.isError }}" hint-placeholder-val="{{ false }}">
+                <div class="blueprint" style="padding: var(--space-4); border-color: var(--color-accent-700);">
+                  <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                  <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);">
+                    <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent-700);">{{ m.errKind }}</span>
+                  </div>
+                  <p style="margin: 0 0 var(--space-3); font-size: 14px;">{{ m.text }}</p>
+                  <p style="margin: 0 0 var(--space-4); font-size: 12px; font-family: ui-monospace, monospace; color: var(--color-neutral-600);">{{ m.errCode }}</p>
+                  <button class="btn btn-secondary" style="height: 30px; font-size: 12px;" onClick="{{ m.onRetry }}">{{ m.retryLabel }}</button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ m.isRetrieving }}" hint-placeholder-val="{{ false }}">
+                <div>
+                  <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-600);">
+                    <span style="width: 5px; height: 5px; background: var(--color-accent); display: block; animation: blink 1s steps(1) infinite;"></span>
+                    <span>Searching {{ chunkCount }} chunks</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 9px;">
+                    <div style="height: 11px; width: 96%; background: linear-gradient(90deg, var(--color-neutral-200) 0%, var(--color-neutral-300) 45%, var(--color-neutral-200) 90%); background-size: 200% 100%; animation: sh 1.4s linear infinite;"></div>
+                    <div style="height: 11px; width: 88%; background: linear-gradient(90deg, var(--color-neutral-200) 0%, var(--color-neutral-300) 45%, var(--color-neutral-200) 90%); background-size: 200% 100%; animation: sh 1.4s linear infinite;"></div>
+                    <div style="height: 11px; width: 62%; background: linear-gradient(90deg, var(--color-neutral-200) 0%, var(--color-neutral-300) 45%, var(--color-neutral-200) 90%); background-size: 200% 100%; animation: sh 1.4s linear infinite;"></div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ m.isAnswer }}" hint-placeholder-val="{{ false }}">
+                <div>
+                  <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-600);">
+                    <span>Answer</span>
+                    <span style="height: 1px; width: 26px; background: var(--color-divider);"></span>
+                    <span>{{ m.retrievalLabel }}</span>
+                  </div>
+                  <div style="font-size: 15px; line-height: 1.62;">
+                    <sc-for list="{{ m.paras }}" as="p" hint-placeholder-count="1">
+                      <p style="margin: 0 0 var(--space-3);">{{ p.text }}</p>
+                    </sc-for>
+                    <sc-if value="{{ m.streaming }}" hint-placeholder-val="{{ false }}">
+                      <span style="display: inline-block; width: 8px; height: 16px; background: var(--color-accent); vertical-align: -3px; animation: blink 1s steps(1) infinite;"></span>
+                    </sc-if>
+                  </div>
+
+                  <sc-if value="{{ m.hasFigures }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top: var(--space-6);">
+                      <div style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin-bottom: var(--space-3);">{{ m.comp.title }}</div>
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-4);">
+                        <sc-for list="{{ m.comp.figures }}" as="f" hint-placeholder-count="4">
+                          <div class="blueprint" style="padding: var(--space-4);">
+                            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                            <div style="font-family: var(--font-heading); font-size: 30px; line-height: 1; color: var(--color-accent-800);">{{ f.value }}</div>
+                            <div style="margin-top: 7px; font-size: 12px;">{{ f.label }}</div>
+                            <div style="margin-top: 3px; font-size: 11px; color: var(--color-neutral-600);">{{ f.note }}</div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ m.hasTable }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top: var(--space-6);">
+                      <div style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin-bottom: var(--space-3);">{{ m.comp.title }}</div>
+                      <div class="blueprint" style="padding: var(--space-4) var(--space-4) var(--space-2);">
+                        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                        <table class="table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                          <thead>
+                            <tr>
+                              <sc-for list="{{ m.comp.cols }}" as="c" hint-placeholder-count="4">
+                                <th style="text-align: {{ c.align }}; padding: 0 var(--space-3) var(--space-2) 0; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; color: var(--color-neutral-600); border-bottom: 1px solid var(--color-divider);">{{ c.label }}</th>
+                              </sc-for>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <sc-for list="{{ m.comp.rows }}" as="r" hint-placeholder-count="4">
+                              <tr style="background: {{ r.bg }};">
+                                <sc-for list="{{ r.cells }}" as="cell" hint-placeholder-count="4">
+                                  <td style="text-align: {{ cell.align }}; padding: var(--space-2) var(--space-3) var(--space-2) 0; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent); font-weight: {{ cell.weight }}; font-variant-numeric: tabular-nums;">{{ cell.v }}</td>
+                                </sc-for>
+                              </tr>
+                            </sc-for>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ m.hasTimeline }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top: var(--space-6);">
+                      <div style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin-bottom: var(--space-4);">{{ m.comp.title }}</div>
+                      <div style="display: flex; flex-direction: column;">
+                        <sc-for list="{{ m.comp.events }}" as="e" hint-placeholder-count="4">
+                          <div style="display: grid; grid-template-columns: 76px 1fr; gap: var(--space-4); padding-bottom: var(--space-6);">
+                            <div style="font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-600); padding-top: 2px;">{{ e.date }}</div>
+                            <div style="position: relative; padding-left: var(--space-6); border-left: 1px solid var(--color-divider);">
+                              <span style="position: absolute; left: -4px; top: 5px; width: 7px; height: 7px; background: var(--color-accent); display: block;"></span>
+                              <div style="font-family: var(--font-heading); font-size: 17px; line-height: 1.2;">{{ e.title }}</div>
+                              <div style="margin-top: 3px; font-size: 13px; color: var(--color-neutral-700);">{{ e.detail }}</div>
+                            </div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ m.hasChecklist }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top: var(--space-6);">
+                      <div style="display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-3);">
+                        <span style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent);">{{ m.comp.title }}</span>
+                        <span style="font-size: 11px; color: var(--color-neutral-600);">{{ m.comp.progress }}</span>
+                      </div>
+                      <div class="blueprint" style="padding: var(--space-2) var(--space-4);">
+                        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                        <sc-for list="{{ m.comp.items }}" as="it" hint-placeholder-count="4">
+                          <button style="display: flex; align-items: flex-start; gap: var(--space-3); width: 100%; padding: var(--space-3) 0; background: transparent; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent); font: inherit; text-align: left; cursor: pointer; color: inherit;" onClick="{{ it.onToggle }}">
+                            <span style="flex: none; width: 17px; height: 17px; margin-top: 2px; border: 1.5px solid {{ it.boxBorder }}; background: {{ it.boxBg }}; display: flex; align-items: center; justify-content: center;">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" stroke-width="2.5" stroke-linecap="round" style="opacity: {{ it.tickOpacity }};"><path d="M4 12.5l5 5L20 6.5"></path></svg>
+                            </span>
+                            <span style="flex: 1;">
+                              <span style="display: block; font-size: 14px; text-decoration: {{ it.deco }}; color: {{ it.textColor }};">{{ it.text }}</span>
+                              <span style="display: block; margin-top: 2px; font-size: 11px; color: var(--color-neutral-600);">{{ it.source }}</span>
+                            </span>
+                          </button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ m.hasEvidence }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top: var(--space-6);">
+                      <div style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin-bottom: var(--space-3);">{{ m.comp.title }}</div>
+                      <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                        <sc-for list="{{ m.comp.cards }}" as="ev" hint-placeholder-count="3">
+                          <div class="blueprint" style="padding: 0;">
+                            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                            <button style="display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-3) var(--space-4); background: transparent; border: 0; font: inherit; text-align: left; cursor: pointer; color: inherit;" style-hover="background: color-mix(in srgb, var(--color-accent) 7%, transparent);" onClick="{{ ev.onToggle }}">
+                              <span style="font-family: var(--font-heading); font-size: 13px; width: 20px; color: var(--color-accent);">{{ ev.rank }}</span>
+                              <span style="flex: 1; font-size: 13px;">{{ ev.label }}</span>
+                              <span style="font-size: 11px; font-family: ui-monospace, monospace; color: var(--color-neutral-600);">{{ ev.score }}</span>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="transform: rotate({{ ev.rot }}deg); transition: transform 140ms ease;"><path d="M6 9l6 6 6-6"></path></svg>
+                            </button>
+                            <sc-if value="{{ ev.open }}" hint-placeholder-val="{{ false }}">
+                              <div style="padding: 0 var(--space-4) var(--space-4);">
+                                <p style="margin: 0 0 var(--space-3); padding-left: var(--space-4); border-left: 2px solid var(--color-accent); font-size: 13px; line-height: 1.6; color: var(--color-neutral-800);">{{ ev.excerpt }}</p>
+                                <div style="display: flex; align-items: center; gap: var(--space-3); font-size: 11px; color: var(--color-neutral-600);">
+                                  <span>{{ ev.where }}</span>
+                                  <button class="btn btn-ghost" style="height: 24px; font-size: 11px;" onClick="{{ ev.onOpen }}">Open in source</button>
+                                </div>
+                              </div>
+                            </sc-if>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ m.hasCitations }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top: var(--space-6); padding-top: var(--space-3); border-top: 1px solid var(--color-divider);">
+                      <div style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-neutral-600); margin-bottom: var(--space-3);">Citations</div>
+                      <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                        <sc-for list="{{ m.citations }}" as="c" hint-placeholder-count="2">
+                          <button style="display: grid; grid-template-columns: 22px 1fr; gap: var(--space-3); width: 100%; padding: var(--space-2) var(--space-3); background: transparent; border: 1px solid var(--color-divider); font: inherit; text-align: left; cursor: pointer; color: inherit;" style-hover="border-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 7%, transparent);" onClick="{{ c.onClick }}">
+                            <span style="font-family: var(--font-heading); font-size: 13px; color: var(--color-accent);">{{ c.n }}</span>
+                            <span>
+                              <span style="display: block; font-size: 12px; color: var(--color-neutral-700);">{{ c.where }}</span>
+                              <span style="display: block; margin-top: 2px; font-size: 13px; line-height: 1.5;">{{ c.excerpt }}</span>
+                            </span>
+                          </button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="flex: none; padding: var(--space-4) var(--space-6) var(--space-6); border-top: 1px solid var(--color-divider);">
+        <div style="max-width: 660px; margin: 0 auto;">
+          <div class="blueprint" style="display: flex; align-items: flex-end; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <button class="btn btn-ghost btn-icon" style="width: 32px; height: 32px; color: var(--color-neutral-700);" title="Attach a document" onClick="{{ onPickFile }}">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+            </button>
+            <textarea rows="1" placeholder="{{ placeholder }}" value="{{ input }}" onChange="{{ onInput }}" onKeyDown="{{ onKey }}" style="flex: 1; min-height: 32px; max-height: 120px; padding: 6px 0; border: 0; background: transparent; resize: none; font: inherit; font-size: 14px; color: inherit; outline: none;"></textarea>
+            <button class="btn btn-primary btn-icon" style="width: 32px; height: 32px;" disabled="{{ sendDisabled }}" onClick="{{ onSend }}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 19V5"></path><path d="M5 12l7-7 7 7"></path></svg>
+            </button>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: var(--space-2); font-size: 11px; color: var(--color-neutral-600);">
+            <span>{{ footHint }}</span>
+            <span>{{ persistHint }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <sc-if value="{{ showSource }}" hint-placeholder-val="{{ true }}">
+      <aside data-screen-label="Source" style="min-width: 0; min-height: 0; height: 100%; overflow: hidden; display: flex; flex-direction: column; background: color-mix(in srgb, var(--color-text) 3%, transparent);">
+        <div style="flex: none; display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-divider);">
+          <span style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-neutral-700);">Source</span>
+          <sc-if value="{{ hasDoc }}" hint-placeholder-val="{{ true }}">
+            <div class="seg">
+              <label class="seg-opt"><input type="radio" name="srctab" checked="{{ outlineOn }}" onChange="{{ onOutline }}"><span>Outline</span></label>
+              <label class="seg-opt"><input type="radio" name="srctab" checked="{{ chunksOn }}" onChange="{{ onChunks }}"><span>Chunks {{ chunkCount }}</span></label>
+            </div>
+          </sc-if>
+        </div>
+
+        <div id="src-scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4);">
+
+          <sc-if value="{{ uploading }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div class="blueprint" style="padding: var(--space-4); margin-bottom: var(--space-6);">
+                <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                <div style="font-family: var(--font-heading); font-size: 16px;">{{ upName }}</div>
+                <div style="margin-top: 2px; font-size: 11px; color: var(--color-neutral-600);">{{ upMeta }}</div>
+                <div style="height: 3px; margin-top: var(--space-3); background: var(--color-neutral-300);">
+                  <div style="height: 3px; width: {{ upPct }}%; background: var(--color-accent); transition: width 220ms linear;"></div>
+                </div>
+                <div style="margin-top: var(--space-3); display: flex; flex-direction: column; gap: 5px;">
+                  <sc-for list="{{ upStages }}" as="st" hint-placeholder-count="4">
+                    <div style="display: flex; align-items: center; gap: var(--space-2); font-size: 12px; color: {{ st.color }};">
+                      <span style="width: 5px; height: 5px; display: block; background: {{ st.dot }};"></span>
+                      <span>{{ st.label }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+                <sc-for list="{{ skeletons }}" as="sk" hint-placeholder-count="4">
+                  <div style="display: flex; flex-direction: column; gap: 7px;">
+                    <div style="height: 9px; width: {{ sk.a }}; background: linear-gradient(90deg, var(--color-neutral-200) 0%, var(--color-neutral-300) 45%, var(--color-neutral-200) 90%); background-size: 200% 100%; animation: sh 1.4s linear infinite;"></div>
+                    <div style="height: 9px; width: {{ sk.b }}; background: linear-gradient(90deg, var(--color-neutral-200) 0%, var(--color-neutral-300) 45%, var(--color-neutral-200) 90%); background-size: 200% 100%; animation: sh 1.4s linear infinite;"></div>
+                    <div style="height: 9px; width: {{ sk.c }}; background: linear-gradient(90deg, var(--color-neutral-200) 0%, var(--color-neutral-300) 45%, var(--color-neutral-200) 90%); background-size: 200% 100%; animation: sh 1.4s linear infinite;"></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ srcEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--space-8) var(--space-4);">
+              <div style="width: 100%; max-width: 220px; height: 130px; border: 1px solid var(--color-divider); background: repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--color-text) 6%, transparent) 7px 8px);"></div>
+              <p style="margin: var(--space-4) 0 0; font-size: 12px; font-family: ui-monospace, monospace; color: var(--color-neutral-600);">document preview</p>
+              <p style="margin: var(--space-2) 0 0; font-size: 12px; color: var(--color-neutral-600); max-width: 220px;">Sections and chunks appear here once a file is indexed.</p>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showOutline }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="margin-bottom: var(--space-4); font-size: 12px; color: var(--color-neutral-700);">{{ docName }} · {{ docMeta }}</div>
+              <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                <sc-for list="{{ sections }}" as="sec" hint-placeholder-count="6">
+                  <button style="display: flex; align-items: baseline; gap: var(--space-3); width: 100%; padding: var(--space-3); background: {{ sec.bg }}; border: 1px solid var(--color-divider); font: inherit; text-align: left; cursor: pointer; color: inherit;" style-hover="border-color: var(--color-accent);" onClick="{{ sec.onClick }}">
+                    <span style="font-family: var(--font-heading); font-size: 12px; color: var(--color-accent); min-width: 16px;">{{ sec.num }}</span>
+                    <span style="flex: 1;">
+                      <span style="display: block; font-size: 14px;">{{ sec.title }}</span>
+                      <span style="display: block; margin-top: 2px; font-size: 11px; color: var(--color-neutral-600);">{{ sec.meta }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showChunks }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+              <sc-for list="{{ chunks }}" as="ch" hint-placeholder-count="9">
+                <div id="{{ ch.domId }}" style="padding: var(--space-3); border: 1px solid {{ ch.border }}; background: {{ ch.bg }};">
+                  <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-600);">
+                    <span style="font-family: ui-monospace, monospace; letter-spacing: 0;">{{ ch.id }}</span>
+                    <span>{{ ch.where }}</span>
+                  </div>
+                  <p style="margin: var(--space-2) 0 0; font-size: 13px; line-height: 1.55;">{{ ch.text }}</p>
+                  <div style="margin-top: var(--space-2); font-size: 10px; font-family: ui-monospace, monospace; color: var(--color-neutral-500);">{{ ch.vec }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ hasDoc }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: none; padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-divider); font-size: 11px; color: var(--color-neutral-600);">{{ storeLine }}</div>
+        </sc-if>
+      </aside>
+    </sc-if>
+  </main>
+
+  <input id="file-input" type="file" accept=".pdf,.txt,.md,.markdown" onChange="{{ onFile }}" style="display: none;">
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;dbLabel&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Neon&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showSourcePane&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showDemoControls&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;latencyMs&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:900,&quot;min&quot;:200,&quot;max&quot;:3000,&quot;step&quot;:100,&quot;unit&quot;:&quot;ms&quot;,&quot;tsType&quot;:&quot;number&quot;}}">
+const DOC = {
+  name: "linkedin-posts-q3.md", kind: "Markdown", size: "42 KB", lines: 178,
+  sections: [
+    { num: "1", title: "Scope", lines: "L1–12", chunks: 1 },
+    { num: "2", title: "Posting cadence", lines: "L14–40", chunks: 2 },
+    { num: "3", title: "Engagement by format", lines: "L42–78", chunks: 3 },
+    { num: "4", title: "Top posts", lines: "L80–120", chunks: 1 },
+    { num: "5", title: "Audience notes", lines: "L122–150", chunks: 1 },
+    { num: "6", title: "Recommendations", lines: "L152–178", chunks: 1 }
+  ],
+  chunks: [
+    { id: "chunk_01", where: "§1 Scope · L3–11", tokens: 96, text: "This review covers every organic post published from the company page between 1 July and 30 September. Paid promotion, employee reshares and comment replies are out of scope." },
+    { id: "chunk_02", where: "§2 Posting cadence · L16–24", tokens: 121, text: "July ran at three posts per week, published ad hoc between 11:00 and 16:00. From 8 August the team moved to a fixed Tuesday and Thursday 09:00 slot." },
+    { id: "chunk_03", where: "§2 Posting cadence · L26–34", tokens: 108, text: "A third slot, a Friday carousel, was added on 2 September. September closed at 26 posts, the highest monthly volume of the quarter." },
+    { id: "chunk_04", where: "§3 Engagement by format · L44–52", tokens: 142, text: "Carousels led engagement rate at 6.8% across 14 posts. Video followed at 5.2% and contributed 727 new followers, more than any other format." },
+    { id: "chunk_05", where: "§3 Engagement by format · L61–66", tokens: 88, text: "Text-only posts were the steadiest performer: 22 posts, none below a 2.1% engagement rate, averaging 3.4% for the quarter." },
+    { id: "chunk_06", where: "§3 Engagement by format · L68–76", tokens: 131, text: "Median dwell time favoured carousels at 48 seconds. Video held attention for 31 seconds, and only 22% of video viewers passed the halfway mark." },
+    { id: "chunk_07", where: "§4 Top posts · L84–96", tokens: 156, text: "The two posts above 10,000 impressions were both carousels: \"Five things we got wrong about onboarding\" (14,200) and \"Our pricing page, annotated\" (11,050)." },
+    { id: "chunk_08", where: "§5 Audience notes · L126–138", tokens: 134, text: "Followers skew to individual contributors in product and design roles. Director-and-above accounts grew 9% but engaged at roughly half the rate." },
+    { id: "chunk_09", where: "§6 Recommendations · L156–172", tokens: 149, text: "Hold the Tuesday/Thursday cadence, keep one carousel per week, cap video at 45 seconds, and test a text-only post on Fridays before adding a fourth slot." }
+  ]
+};
+
+const C = id => DOC.chunks.find(c => c.id === id);
+const cite = (n, id) => ({ n: n, chunk: id, where: DOC.name + " · " + C(id).where, excerpt: C(id).text });
+
+const ANSWERS = [
+  {
+    keys: ["format", "best", "carousel", "perform", "compare", "video vs"],
+    text: "Carousels led on engagement rate for the quarter — 6.8% across 14 posts — while video drove the most new followers at 727. [1]\nText-only was the least spectacular and the most reliable: 22 posts, none below a 2.1% engagement rate. [2]",
+    citations: [cite(1, "chunk_04"), cite(2, "chunk_05")],
+    comp: {
+      type: "table", title: "Format comparison",
+      cols: [{ label: "Format" }, { label: "Posts", align: "right" }, { label: "Avg engagement", align: "right" }, { label: "New followers", align: "right" }, { label: "Median dwell", align: "right" }],
+      rows: [
+        { hi: true, cells: ["Carousel", "14", "6.8%", "310", "48s"] },
+        { cells: ["Video", "9", "5.2%", "727", "31s"] },
+        { cells: ["Text-only", "22", "3.4%", "188", "22s"] },
+        { cells: ["Single image", "11", "2.9%", "96", "18s"] }
+      ]
+    }
+  },
+  {
+    keys: ["cadence", "schedule", "when", "timeline", "over the quarter", "posting"],
+    text: "Cadence tightened as the quarter went on: an ad-hoc three-a-week July, a fixed Tuesday/Thursday slot from 8 August, and a third Friday slot from 2 September. [1] [2]",
+    citations: [cite(1, "chunk_02"), cite(2, "chunk_03")],
+    comp: {
+      type: "timeline", title: "Cadence changes",
+      events: [
+        { date: "Jul", title: "Ad-hoc, 3× per week", detail: "12 posts, published between 11:00 and 16:00 with no fixed slot." },
+        { date: "8 Aug", title: "Fixed Tue/Thu 09:00", detail: "Publishing moved to a standing two-slot schedule." },
+        { date: "Aug", title: "18 posts", detail: "First full month on the fixed cadence." },
+        { date: "2 Sep", title: "Friday carousel added", detail: "A third weekly slot, reserved for carousels." },
+        { date: "Sep", title: "26 posts", detail: "Highest monthly volume of the quarter." }
+      ]
+    }
+  },
+  {
+    keys: ["number", "figure", "stat", "summar", "headline", "how many"],
+    text: "Across the quarter the page published 56 posts and added 1,321 followers, averaging 4.6% engagement. [1] Two posts cleared 10,000 impressions, both carousels. [2]",
+    citations: [cite(1, "chunk_04"), cite(2, "chunk_07")],
+    comp: {
+      type: "figures", title: "Key figures",
+      figures: [
+        { value: "56", label: "Posts published", note: "1 Jul – 30 Sep" },
+        { value: "4.6%", label: "Avg engagement", note: "all formats" },
+        { value: "+1,321", label: "New followers", note: "727 from video" },
+        { value: "2", label: "Posts over 10k", note: "both carousels" }
+      ]
+    }
+  },
+  {
+    keys: ["recommend", "next quarter", "should we", "action", "do next", "checklist"],
+    text: "Section 6 makes four commitments and one test. [1] They are listed below — tick them off as you plan.",
+    citations: [cite(1, "chunk_09")],
+    comp: {
+      type: "checklist", title: "Recommended actions",
+      items: [
+        { text: "Hold the Tuesday/Thursday 09:00 cadence", source: "§6 · L156" },
+        { text: "Keep one carousel per week", source: "§6 · L160" },
+        { text: "Cap video length at 45 seconds", source: "§6 · L164" },
+        { text: "Test a text-only Friday post before adding a fourth slot", source: "§6 · L168" },
+        { text: "Re-check director-and-above engagement in October", source: "§5 · L132" }
+      ]
+    }
+  },
+  {
+    keys: ["dwell", "evidence", "attention", "halfway", "why", "support"],
+    text: "Three passages bear on video's attention problem. The strongest is the dwell-time comparison: 31 seconds against 48 for carousels, with only 22% of viewers passing the halfway mark. [1]",
+    citations: [cite(1, "chunk_06")],
+    comp: {
+      type: "evidence", title: "Retrieved evidence",
+      cards: [
+        { label: "Dwell time by format", score: "0.91", chunk: "chunk_06" },
+        { label: "Engagement and follower gain by format", score: "0.84", chunk: "chunk_04" },
+        { label: "Top posts above 10k impressions", score: "0.71", chunk: "chunk_07" }
+      ]
+    }
+  }
+];
+
+const NOT_FOUND = {
+  notFound: true,
+  text: "Nothing in this document answers that. The closest passages are about posting cadence and format performance, none of which mention it.\nIf it should be in here, the source file may be an older export.",
+  citations: []
+};
+
+const STAGES = ["Uploading file", "Extracting text", "Chunking (9 chunks)", "Embedding · 1536-d", "Writing to Neon"];
+const SKELETONS = [{ a: "94%", b: "78%", c: "88%" }, { a: "86%", b: "92%", c: "64%" }, { a: "72%", b: "88%", c: "80%" }, { a: "90%", b: "68%", c: "84%" }];
+const KEY = "docdesk.chat.v1";
+
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.uid = 0;
+    this.state = { doc: null, msgs: [], input: "", tab: "outline", active: null, open: {}, checked: {}, up: null, forceError: false, sync: "synced" };
+  }
+
+  componentDidMount() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        const msgs = (s.msgs || []).map(m => m.status === "retrieving" || m.status === "streaming" ? Object.assign({}, m, { status: "done" }) : m);
+        this.uid = s.uid || msgs.length;
+        this.setState({ doc: s.doc || null, msgs: msgs, open: s.open || {}, checked: s.checked || {}, active: s.active || null });
+      }
+    } catch (e) { /* first run */ }
+  }
+
+  componentDidUpdate(pp, ps) {
+    if (ps.msgs !== this.state.msgs || ps.doc !== this.state.doc || ps.checked !== this.state.checked || ps.open !== this.state.open) {
+      try {
+        localStorage.setItem(KEY, JSON.stringify({ uid: this.uid, doc: this.state.doc, msgs: this.state.msgs, open: this.state.open, checked: this.state.checked, active: this.state.active }));
+      } catch (e) { /* quota */ }
+    }
+    if (ps.msgs !== this.state.msgs) {
+      const stick = () => { const el = document.getElementById("chat-scroll"); if (el) el.scrollTop = el.scrollHeight; };
+      stick();
+      requestAnimationFrame(() => requestAnimationFrame(stick));
+    }
+    if (this.state.active && (ps.active !== this.state.active || ps.tab !== this.state.tab)) {
+      const box = document.getElementById("src-scroll");
+      const t = box && box.querySelector("#src-" + this.state.active);
+      if (box && t) box.scrollTop = Math.max(0, t.offsetTop - box.offsetTop - 12);
+    }
+  }
+
+  componentWillUnmount() { clearInterval(this.iv); clearTimeout(this.t1); clearTimeout(this.t2); }
+
+  patch(id, fields) {
+    this.setState(s => ({ msgs: s.msgs.map(m => m.id === id ? Object.assign({}, m, fields) : m) }));
+  }
+
+  push(m) { this.setState(s => ({ msgs: s.msgs.concat([m]) })); }
+
+  // — upload —
+  startUpload(name, size, bad) {
+    if (bad) {
+      this.push({ id: "e" + (++this.uid), role: "error", kind: "Unsupported file", text: "\u201C" + name + "\u201D is a " + name.split(".").pop().toUpperCase() + " file. This app reads PDF, TXT and Markdown.", code: "ERR_UNSUPPORTED_TYPE · nothing was written to " + this.db(), retry: "Choose another file", onRetry: () => this.pick() });
+      return;
+    }
+    this.setState({ up: { name: name, size: size, stage: 0 } });
+    const tick = () => {
+      const st = this.state.up;
+      if (!st) return;
+      if (st.stage >= STAGES.length - 1) {
+        this.setState({ up: null, doc: { name: name, size: size, kind: /\.pdf$/i.test(name) ? "PDF" : /\.txt$/i.test(name) ? "Plain text" : "Markdown" }, tab: "outline" });
+        this.push({ id: "n" + (++this.uid), role: "note", text: "Indexed 9 chunks · 1536-d embeddings · stored in " + this.db() });
+        return;
+      }
+      this.setState({ up: Object.assign({}, st, { stage: st.stage + 1 }) });
+      this.t2 = setTimeout(tick, 620);
+    };
+    this.t2 = setTimeout(tick, 620);
+  }
+
+  pick() { const el = document.getElementById("file-input"); if (el) el.click(); }
+
+  onFile(e) {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const ok = /\.(pdf|txt|md|markdown)$/i.test(f.name);
+    this.startUpload(f.name, Math.max(1, Math.round(f.size / 1024)) + " KB", !ok);
+    e.target.value = "";
+  }
+
+  // — query —
+  resolve(q) {
+    const s = q.toLowerCase();
+    for (const a of ANSWERS) if (a.keys.some(k => s.includes(k))) return a;
+    return NOT_FOUND;
+  }
+
+  ask(q) {
+    if (!q.trim() || !this.state.doc) return;
+    clearInterval(this.iv); clearTimeout(this.t1);
+    const n = ++this.uid;
+    const aid = "a" + n;
+    this.setState(s => ({ input: "", msgs: s.msgs.concat([{ id: "u" + n, role: "user", text: q }, { id: aid, role: "assistant", status: "retrieving", q: q }]) }));
+    const lat = this.props.latencyMs == null ? 900 : this.props.latencyMs;
+    this.t1 = setTimeout(() => this.answer(aid, q), Math.max(200, lat));
+  }
+
+  answer(aid, q) {
+    if (this.state.forceError) {
+      this.setState(s => ({
+        forceError: false,
+        msgs: s.msgs.map(m => m.id === aid ? { id: aid, role: "error", kind: "Retrieval failed", text: "The vector search did not come back. Your document and this conversation are safe in " + this.db() + " — only the lookup failed.", code: "ERR_NEON_TIMEOUT · pgvector query exceeded 8s", retry: "Retry question", q: q } : m)
+      }));
+      return;
+    }
+    const a = this.resolve(q);
+    this.patch(aid, { status: "streaming", ans: a, shown: 0 });
+    this.iv = setInterval(() => {
+      const m = this.state.msgs.find(x => x.id === aid);
+      if (!m || !m.ans) { clearInterval(this.iv); return; }
+      const next = m.shown + 4;
+      if (next >= m.ans.text.length) { clearInterval(this.iv); this.patch(aid, { shown: m.ans.text.length, status: "done" }); }
+      else this.patch(aid, { shown: next });
+    }, 18);
+  }
+
+  db() { return this.props.dbLabel || "Neon"; }
+
+  reset() {
+    clearInterval(this.iv); clearTimeout(this.t1); clearTimeout(this.t2);
+    this.uid = 0;
+    this.setState({ doc: null, msgs: [], input: "", up: null, active: null, open: {}, checked: {}, tab: "outline", forceError: false });
+    try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+  }
+
+  focusChunk(id) { this.setState({ tab: "chunks", active: id }); }
+
+  renderVals() {
+    const s = this.state;
+    const doc = s.doc;
+    const showSource = this.props.showSourcePane !== false;
+    const muted = "var(--color-neutral-700)";
+
+    const view = s.msgs.map(m => {
+      if (m.role === "user") return { key: m.id, isUser: true, text: m.text };
+      if (m.role === "note") return { key: m.id, isNote: true, text: m.text };
+      if (m.role === "error") return {
+        key: m.id, isError: true, text: m.text, errKind: m.kind, errCode: m.code,
+        retryLabel: m.retry || "Retry",
+        onRetry: m.onRetry || (() => { this.setState(st => ({ msgs: st.msgs.filter(x => x.id !== m.id) })); this.ask(m.q); })
+      };
+      if (m.status === "retrieving") return { key: m.id, isRetrieving: true };
+
+      const a = m.ans || {};
+      const streaming = m.status === "streaming";
+      const shown = streaming ? a.text.slice(0, m.shown) : a.text;
+      const paras = shown.split("\n").filter(t => t.length).map((t, i) => ({ key: i, text: t }));
+      const done = !streaming;
+      const comp = a.comp || {};
+      let c = null;
+      if (done && comp.type === "table") {
+        c = {
+          title: comp.title,
+          cols: comp.cols.map((col, i) => ({ key: i, label: col.label, align: col.align || "left" })),
+          rows: comp.rows.map((r, i) => ({
+            key: i, bg: r.hi ? "color-mix(in srgb, var(--color-accent) 10%, transparent)" : "transparent",
+            cells: r.cells.map((v, j) => ({ key: j, v: v, align: comp.cols[j].align || "left", weight: j === 0 || r.hi ? "600" : "400" }))
+          }))
+        };
+      } else if (done && comp.type === "timeline") {
+        c = { title: comp.title, events: comp.events.map((e, i) => ({ key: i, date: e.date, title: e.title, detail: e.detail })) };
+      } else if (done && comp.type === "figures") {
+        c = { title: comp.title, figures: comp.figures.map((f, i) => ({ key: i, value: f.value, label: f.label, note: f.note })) };
+      } else if (done && comp.type === "checklist") {
+        const items = comp.items.map((it, i) => {
+          const k = m.id + ":" + i;
+          const on = !!s.checked[k];
+          return {
+            key: i, text: it.text, source: it.source,
+            boxBorder: on ? "var(--color-accent)" : "var(--color-divider)",
+            boxBg: on ? "var(--color-accent)" : "transparent",
+            tickOpacity: on ? 1 : 0,
+            deco: on ? "line-through" : "none",
+            textColor: on ? muted : "var(--color-text)",
+            onToggle: () => this.setState(st => ({ checked: Object.assign({}, st.checked, { [k]: !st.checked[k] }) }))
+          };
+        });
+        const n = items.filter(i => i.tickOpacity === 1).length;
+        c = { title: comp.title, progress: n + " of " + items.length + " planned", items: items };
+      } else if (done && comp.type === "evidence") {
+        c = {
+          title: comp.title,
+          cards: comp.cards.map((ev, i) => {
+            const k = m.id + ":ev" + i;
+            const open = !!s.open[k];
+            const ch = C(ev.chunk);
+            return {
+              key: i, rank: "0" + (i + 1), label: ev.label, score: ev.score, open: open,
+              rot: open ? 180 : 0, excerpt: ch.text, where: DOC.name + " · " + ch.where,
+              onToggle: () => this.setState(st => ({ open: Object.assign({}, st.open, { [k]: !st.open[k] }) })),
+              onOpen: () => this.focusChunk(ev.chunk)
+            };
+          })
+        };
+      }
+
+      return {
+        key: m.id, isAnswer: true, paras: paras, streaming: streaming,
+        retrievalLabel: a.notFound ? "no passage above threshold" : "3 chunks retrieved · cosine 0.71–0.91",
+        hasTable: !!c && comp.type === "table", hasTimeline: !!c && comp.type === "timeline",
+        hasFigures: !!c && comp.type === "figures", hasChecklist: !!c && comp.type === "checklist",
+        hasEvidence: !!c && comp.type === "evidence", comp: c || {},
+        hasCitations: done && !!(a.citations && a.citations.length),
+        citations: (a.citations || []).map(ct => ({ key: ct.n, n: ct.n, where: ct.where, excerpt: "\u201C" + ct.excerpt + "\u201D", onClick: () => this.focusChunk(ct.chunk) }))
+      };
+    });
+
+    const suggestions = [
+      { kind: "Table", q: "Which post format performed best?" },
+      { kind: "Timeline", q: "How did the posting cadence change over the quarter?" },
+      { kind: "Figures", q: "Give me the headline numbers." },
+      { kind: "Checklist", q: "What should we do next quarter?" },
+      { kind: "Evidence", q: "What is the evidence on video dwell time?" },
+      { kind: "No answer", q: "What did the CEO say about pricing?" }
+    ].map((x, i) => ({ key: i, kind: x.kind, q: x.q, onClick: () => this.ask(x.q) }));
+
+    return {
+      dbLabel: this.db(),
+      syncLabel: doc ? "conversation persisted" : "connected",
+      showDemo: this.props.showDemoControls !== false,
+      errBorder: s.forceError ? "var(--color-accent)" : "var(--color-divider)",
+      onToggleError: () => this.setState(st => ({ forceError: !st.forceError })),
+      onBadFile: () => this.startUpload("q3-deck.pptx", "3.1 MB", true),
+      onReset: () => this.reset(),
+      gridCols: showSource ? "minmax(0, 1fr) 400px" : "minmax(0, 1fr)",
+      showSource: showSource,
+      hasDoc: !!doc, noDoc: !doc && !s.up && !s.msgs.length,
+      docName: doc ? doc.name : DOC.name,
+      docMeta: doc ? doc.kind + " · " + doc.size + " · 9 chunks" : "",
+      chunkCount: DOC.chunks.length,
+      showSuggestions: !!doc && !s.msgs.filter(m => m.role === "user").length,
+      suggestions: suggestions,
+      view: view,
+      input: s.input,
+      placeholder: doc ? "Ask about " + DOC.name : "Upload a document to start asking",
+      sendDisabled: !doc || !s.input.trim(),
+      footHint: doc ? "Enter to send · Shift+Enter for a new line" : "PDF, TXT or Markdown",
+      persistHint: doc ? "Chat 3f2a · " + this.db() : "",
+      onInput: e => this.setState({ input: e.target.value }),
+      onKey: e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.ask(this.state.input); } },
+      onSend: () => this.ask(s.input),
+      onPickFile: () => this.pick(),
+      onSample: () => this.startUpload(DOC.name, DOC.size, false),
+      onFile: e => this.onFile(e),
+      uploading: !!s.up,
+      upName: s.up ? s.up.name : "",
+      upMeta: s.up ? s.up.size + " · parsing" : "",
+      upPct: s.up ? Math.round(((s.up.stage + 1) / STAGES.length) * 100) : 0,
+      upStages: STAGES.map((label, i) => ({
+        key: i, label: label,
+        color: s.up && i <= s.up.stage ? "var(--color-text)" : "var(--color-neutral-500)",
+        dot: s.up && i < s.up.stage ? "var(--color-accent)" : s.up && i === s.up.stage ? "var(--color-accent-400)" : "var(--color-neutral-300)"
+      })),
+      skeletons: SKELETONS.map((x, i) => ({ key: i, a: x.a, b: x.b, c: x.c })),
+      srcEmpty: !doc && !s.up,
+      outlineOn: s.tab === "outline", chunksOn: s.tab === "chunks",
+      onOutline: () => this.setState({ tab: "outline" }),
+      onChunks: () => this.setState({ tab: "chunks" }),
+      showOutline: !!doc && s.tab === "outline",
+      showChunks: !!doc && s.tab === "chunks",
+      sections: DOC.sections.map((sec, i) => ({
+        key: i, num: sec.num, title: sec.title, meta: sec.lines + " · " + sec.chunks + (sec.chunks === 1 ? " chunk" : " chunks"),
+        bg: "transparent", onClick: () => this.setState({ tab: "chunks", active: DOC.chunks.filter(c => c.where.indexOf("§" + sec.num) === 0)[0] ? DOC.chunks.filter(c => c.where.indexOf("§" + sec.num) === 0)[0].id : null })
+      })),
+      chunks: DOC.chunks.map((ch, i) => ({
+        key: i, domId: "src-" + ch.id, id: ch.id, where: ch.where, text: ch.text,
+        vec: "vector[1536] · " + ch.tokens + " tokens",
+        border: s.active === ch.id ? "var(--color-accent)" : "var(--color-divider)",
+        bg: s.active === ch.id ? "color-mix(in srgb, var(--color-accent) 12%, transparent)" : "transparent"
+      })),
+      storeLine: "documents · chunks · embeddings · chats · messages — 5 tables in " + this.db()
+    };
+  }
+}
+
+</script>
+</body>
+</html>
