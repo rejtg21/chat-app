@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Blueprint } from "@/components/Blueprint";
+import { DocumentSelect } from "@/components/DocumentSelect";
+import { ExcerptModal } from "@/components/ExcerptModal";
 import { STORE_LINE } from "@/lib/config";
 import { documentMeta, formatBytes, pluralise } from "@/lib/format";
 import type {
@@ -29,6 +31,9 @@ const SKELETONS = [
 
 export const SourcePane = ({
   document,
+  documents,
+  onSelectDocument,
+  switching,
   chunks,
   outline,
   tab,
@@ -38,6 +43,12 @@ export const SourcePane = ({
   upload,
 }: {
   document: DocumentSummary | null;
+  /** Every indexed document — the same list the header dropdown offers. */
+  documents: DocumentSummary[];
+  /** Switch to another document's chat room, from the right pane. */
+  onSelectDocument: (documentId: string) => void;
+  /** True while a chat room is being loaded — locks the dropdown. */
+  switching?: boolean;
   chunks: ChunkRecord[];
   outline: OutlineSection[];
   tab: SourceTab;
@@ -46,6 +57,12 @@ export const SourcePane = ({
   onFocusChunk: (chunkId: string) => void;
   upload: UploadProgress | null;
 }) => {
+  // The most recently indexed document. Anything else in the list is an
+  // earlier upload; this is the one "current" points back to.
+  const currentId = documents[0]?.id;
+  const viewingPrevious = Boolean(
+    document && currentId && document.id !== currentId,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Bring the cited chunk to the top of the pane. Re-runs on tab change too,
@@ -83,9 +100,10 @@ export const SourcePane = ({
         <span
           style={{
             fontSize: 11,
+            fontWeight: 700,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "var(--color-neutral-700)",
+            color: "var(--color-accent-700)",
           }}
         >
           Source
@@ -113,6 +131,73 @@ export const SourcePane = ({
           </div>
         ) : null}
       </div>
+
+      {document ? (
+        <div
+          style={{
+            flex: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-2) var(--space-4)",
+            borderBottom: "1px solid var(--color-divider)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "var(--color-accent-700)",
+              flex: "none",
+            }}
+          >
+            Document
+          </span>
+
+          {documents.length > 1 ? (
+            <DocumentSelect
+              documents={documents}
+              value={document.id}
+              onSelect={onSelectDocument}
+              disabled={switching || Boolean(upload)}
+              markCurrentId={currentId}
+            />
+          ) : (
+            <span
+              style={{
+                fontFamily: "var(--font-heading)",
+                fontSize: 14,
+                minWidth: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {document.filename}
+            </span>
+          )}
+
+          {viewingPrevious ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                flex: "none",
+                marginLeft: "auto",
+                height: 24,
+                fontSize: 11,
+              }}
+              onClick={() => currentId && onSelectDocument(currentId)}
+              disabled={switching || Boolean(upload)}
+              title="Switch back to the most recently added document"
+            >
+              Back to current
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div
         ref={scrollRef}
@@ -385,6 +470,16 @@ const Outline = ({
  * purpose: seeing the source text is what makes the answers credible, so it
  * is inspectable rather than hidden.
  */
+/** "Section 4 · page 1" or "Section 2 · lines 44–52" — the excerpt's locus. */
+const excerptLocus = (chunk: ChunkRecord): string => {
+  const parts = [`Section ${chunk.sectionOrdinal}`];
+  if (chunk.page !== null) parts.push(`page ${chunk.page}`);
+  else if (chunk.lineStart !== null && chunk.lineEnd !== null) {
+    parts.push(`lines ${chunk.lineStart}–${chunk.lineEnd}`);
+  }
+  return parts.join(" · ");
+};
+
 const Chunks = ({
   chunks,
   activeChunkId,
@@ -392,15 +487,29 @@ const Chunks = ({
   chunks: ChunkRecord[];
   activeChunkId: string | null;
 }) => {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = chunks.find((chunk) => chunk.id === openId) ?? null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
       {chunks.map((chunk) => {
         const isActive = chunk.id === activeChunkId;
+        const title = chunk.sectionLabel || `Excerpt ${chunk.ordinal + 1}`;
         return (
-          <div
+          <button
             key={chunk.id}
             id={`src-${chunk.id}`}
+            type="button"
+            className="outline-btn"
+            onClick={() => setOpenId(chunk.id)}
+            aria-haspopup="dialog"
             style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
+              font: "inherit",
+              color: "inherit",
+              cursor: "pointer",
               padding: "var(--space-3)",
               border: `1px solid ${
                 isActive ? "var(--color-accent)" : "var(--color-divider)"
@@ -413,26 +522,55 @@ const Chunks = ({
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "baseline",
                 justifyContent: "space-between",
                 gap: "var(--space-2)",
-                fontSize: 10,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--color-neutral-600)",
               }}
             >
-              <span style={{ fontFamily: "var(--font-mono)", letterSpacing: 0 }}>
+              <span style={{ fontSize: 14, lineHeight: 1.3 }}>{title}</span>
+              <span
+                style={{
+                  flexShrink: 0,
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  color: "var(--color-neutral-600)",
+                }}
+              >
                 {chunk.label}
               </span>
-              <span style={{ textAlign: "right" }}>{chunk.where}</span>
             </div>
-            <p style={{ margin: "var(--space-2) 0 0", fontSize: 13, lineHeight: 1.55 }}>
+            <div style={{ marginTop: 2, fontSize: 11, color: "var(--color-neutral-600)" }}>
+              {[chunk.where, pluralise(chunk.tokenCount, "token")]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+            <p
+              style={{
+                margin: "var(--space-2) 0 0",
+                fontSize: 13,
+                lineHeight: 1.55,
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
               {chunk.text}
             </p>
-          </div>
+          </button>
         );
       })}
+
+      {open ? (
+        <ExcerptModal
+          badge={open.ordinal + 1}
+          kind="Excerpt"
+          title={open.sectionLabel || `Excerpt ${open.ordinal + 1}`}
+          trail={excerptLocus(open)}
+          excerpt={open.text}
+          onClose={() => setOpenId(null)}
+        />
+      ) : null}
     </div>
   );
 };

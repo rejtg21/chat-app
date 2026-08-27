@@ -38,8 +38,9 @@ export const EmptyState = ({
           color: "var(--color-neutral-700)",
         }}
       >
-        Upload a PDF, TXT or Markdown file. It is read and saved, so this
-        conversation survives a reload.
+        Upload a PDF, TXT or Markdown file and ask questions about it. Your
+        file and the conversation are saved automatically, so they’re still
+        here if you refresh or come back later.
       </p>
       <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
         <button

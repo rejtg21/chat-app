@@ -1,7 +1,16 @@
-import { RETRIEVAL_TOP_K, SIMILARITY_THRESHOLD } from "@/lib/config";
+import {
+  RELATIVE_SIMILARITY_GAP,
+  RETRIEVAL_TOP_K,
+  SIMILARITY_THRESHOLD,
+} from "@/lib/config";
 import { asRetrievalError, query, toVectorLiteral } from "@/lib/db";
 import { embedText } from "@/lib/embeddings";
-import { chunkLabel, chunkWhere, citationWhere } from "@/lib/format";
+import {
+  chunkLabel,
+  chunkWhere,
+  citationWhere,
+  normalizeCitationMarkers,
+} from "@/lib/format";
 import type { Citation, ChunkRecord, RetrievalMeta } from "@/lib/types";
 
 /** A chunk plus how well it matched the question. */
@@ -34,9 +43,11 @@ interface ScoredRow {
  * Vectors are stored L2-normalised, so cosine similarity is exactly
  * `1 - (a <=> b)` where `<=>` is pgvector's cosine-distance operator.
  *
- * Chunks below SIMILARITY_THRESHOLD are dropped rather than passed along
- * weakly: a low-scoring passage in the prompt is what produces a confident
- * answer about something the document does not say.
+ * Two gates trim the result. The absolute SIMILARITY_THRESHOLD answers "is
+ * this on the question's topic at all" — it is what keeps an off-topic
+ * question from being answered out of unrelated passages. The relative
+ * RELATIVE_SIMILARITY_GAP then drops anything sitting well below the best
+ * hit, so a strong top match doesn't drag a trail of weak context behind it.
  */
 export const retrieve = async (
   documentId: string,
@@ -64,28 +75,35 @@ export const retrieve = async (
     throw asRetrievalError(cause);
   }
 
-  const chunks: RetrievedChunk[] = rows
-    .map((row) => {
-      const location = {
-        sectionOrdinal: row.section_ordinal,
-        sectionLabel: row.section_label,
-        page: row.page,
-        lineStart: row.line_start,
-        lineEnd: row.line_end,
-      };
-      return {
-        id: row.id,
-        documentId: row.document_id,
-        ordinal: row.ordinal,
-        label: chunkLabel(row.ordinal),
-        ...location,
-        tokenCount: row.token_count,
-        text: row.text,
-        where: chunkWhere(location),
-        score: Number(row.score),
-      };
-    })
-    .filter((chunk) => chunk.score >= SIMILARITY_THRESHOLD);
+  // `rows` arrives ordered by cosine distance ascending, i.e. score
+  // descending, so the first mapped chunk carries the best score.
+  const scored: RetrievedChunk[] = rows.map((row) => {
+    const location = {
+      sectionOrdinal: row.section_ordinal,
+      sectionLabel: row.section_label,
+      page: row.page,
+      lineStart: row.line_start,
+      lineEnd: row.line_end,
+    };
+    return {
+      id: row.id,
+      documentId: row.document_id,
+      ordinal: row.ordinal,
+      label: chunkLabel(row.ordinal),
+      ...location,
+      tokenCount: row.token_count,
+      text: row.text,
+      where: chunkWhere(location),
+      score: Number(row.score),
+    };
+  });
+
+  const topScore = scored[0]?.score ?? 0;
+  const chunks = scored.filter(
+    (chunk) =>
+      chunk.score >= SIMILARITY_THRESHOLD &&
+      chunk.score >= topScore - RELATIVE_SIMILARITY_GAP,
+  );
 
   const scores = chunks.map((chunk) => chunk.score);
 
@@ -127,9 +145,9 @@ export const resolveCitations = (
   chunks: readonly RetrievedChunk[],
   filename: string,
 ): Citation[] => {
-  const markers = [...answer.matchAll(/\[(\d{1,2})\]/g)].map((match) =>
-    Number(match[1]),
-  );
+  const markers = [
+    ...normalizeCitationMarkers(answer).matchAll(/\[(\d{1,2})\]/g),
+  ].map((match) => Number(match[1]));
 
   const seen = new Set<number>();
   const citations: Citation[] = [];

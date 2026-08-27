@@ -57,19 +57,29 @@ export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 export const ACCEPTED_EXTENSIONS = ["pdf", "txt", "md", "markdown"] as const;
 export const ACCEPT_ATTRIBUTE = ".pdf,.txt,.md,.markdown";
 
-/** Retrieval. */
-export const RETRIEVAL_TOP_K = 5;
+/**
+ * Retrieval fan-out: how many chunks the cosine search returns before the
+ * similarity gates below trim it. Five was too tight for broad,
+ * whole-document questions ("what is the goal of this paper") whose answer is
+ * spread across the intro and summary and has to compete with every other
+ * chunk for a slot. Env-overridable so this can be tuned per corpus without a
+ * code change.
+ */
+export const RETRIEVAL_TOP_K = Number(process.env.RETRIEVAL_TOP_K ?? 12);
 
 /**
- * Cosine similarity below which a chunk is not considered to answer the
- * question. When nothing clears it, the answer is still a first-class answer
- * — it just carries no citations and no structured component.
+ * Absolute cosine floor: below this, a chunk is not considered to be on the
+ * question's topic at all. When nothing clears it, the answer is still a
+ * first-class answer — it just carries no citations and no structured
+ * component.
  *
  * The value is model-specific and has to be measured, not guessed. gte-small
  * has a high similarity floor: against the bundled sample, questions with no
  * answer in the document ("What is the capital of Peru?", "How do I bake
  * sourdough?") still score 0.685–0.781, while genuinely on-topic questions
- * score 0.836–0.897 at the top chunk. 0.80 sits in that gap.
+ * score 0.836–0.897 at the top chunk. 0.72 sits just above the off-topic
+ * band, so a meta question phrased unlike the document's prose still retrieves
+ * while "capital of Peru" still does not.
  *
  * A naive low threshold like 0.3 would make the "no passage above threshold"
  * state unreachable, and every off-topic question would get a confident
@@ -80,12 +90,36 @@ export const RETRIEVAL_TOP_K = 5;
  * does not require a code change.
  */
 export const SIMILARITY_THRESHOLD = Number(
-  process.env.SIMILARITY_THRESHOLD ?? 0.8,
+  process.env.SIMILARITY_THRESHOLD ?? 0.72,
+);
+
+/**
+ * Relative gate: once the top chunk's score is known, drop any chunk that
+ * sits more than this far below it. A strong top match (0.89) then does not
+ * drag a trail of weak 0.73 context into the prompt behind it, while a
+ * borderline top match (0.80) still keeps its near-equal supporting chunks.
+ */
+export const RELATIVE_SIMILARITY_GAP = Number(
+  process.env.RELATIVE_SIMILARITY_GAP ?? 0.1,
 );
 
 /** Chunking. Sized so a chunk is a readable excerpt in the source pane. */
 export const CHUNK_TARGET_CHARS = 900;
 export const CHUNK_OVERLAP_CHARS = 160;
+
+/**
+ * A whole-document question — "summarise this whitepaper" — can run past the
+ * answer model's output-token ceiling and stop mid-sentence. When that
+ * happens the chat route replays the answer so far and asks the model to
+ * continue, streaming the next piece into the same message, up to this many
+ * segments in total (the first one included). The cap stops a runaway
+ * generation from spending the whole `maxDuration` budget; env-overridable so
+ * it can be raised for a corpus of very long documents without a code change.
+ */
+export const MAX_ANSWER_SEGMENTS = Math.max(
+  1,
+  Number(process.env.MAX_ANSWER_SEGMENTS ?? 4),
+);
 
 /** Shown in the header and the source-pane footer. */
 export const DB_LABEL = "Neon";

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Plus } from "lucide-react";
+import { ArrowUp, Plus, Square } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Blueprint } from "@/components/Blueprint";
 
@@ -8,6 +8,7 @@ export const Composer = ({
   value,
   onChange,
   onSend,
+  onStop,
   onAttach,
   hasDocument,
   filename,
@@ -16,6 +17,7 @@ export const Composer = ({
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
+  onStop: () => void;
   onAttach: () => void;
   hasDocument: boolean;
   filename: string | null;
@@ -31,7 +33,9 @@ export const Composer = ({
     element.style.height = `${Math.min(element.scrollHeight, 120)}px`;
   }, [value]);
 
-  const canSend = hasDocument && value.trim().length > 0 && !busy;
+  // Sending is allowed while a previous answer is still streaming — the parent
+  // interrupts it and asks the new question. Only an empty box blocks send.
+  const canSend = hasDocument && value.trim().length > 0;
 
   return (
     <div
@@ -54,8 +58,8 @@ export const Composer = ({
             type="button"
             className="btn btn-ghost btn-icon"
             style={{ width: 32, height: 32, color: "var(--color-neutral-700)" }}
-            title="Attach a document"
-            aria-label="Attach a document"
+            title="Add a document"
+            aria-label="Add a document"
             onClick={onAttach}
           >
             <Plus size={17} strokeWidth={1.5} aria-hidden />
@@ -93,16 +97,29 @@ export const Composer = ({
             }}
           />
 
-          <button
-            type="button"
-            className="btn btn-primary btn-icon"
-            style={{ width: 32, height: 32 }}
-            disabled={!canSend}
-            aria-label="Send question"
-            onClick={onSend}
-          >
-            <ArrowUp size={16} strokeWidth={1.5} aria-hidden />
-          </button>
+          {busy ? (
+            <button
+              type="button"
+              className="btn btn-secondary btn-icon"
+              style={{ width: 32, height: 32 }}
+              aria-label="Stop generating"
+              title="Stop generating"
+              onClick={onStop}
+            >
+              <Square size={13} strokeWidth={1.5} aria-hidden />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary btn-icon"
+              style={{ width: 32, height: 32 }}
+              disabled={!canSend}
+              aria-label="Send question"
+              onClick={onSend}
+            >
+              <ArrowUp size={16} strokeWidth={1.5} aria-hidden />
+            </button>
+          )}
         </Blueprint>
 
         <div
@@ -115,9 +132,11 @@ export const Composer = ({
           }}
         >
           <span>
-            {hasDocument
-              ? "Enter to send · Shift+Enter for a new line"
-              : "PDF, TXT or Markdown"}
+            {!hasDocument
+              ? "Works with PDF, TXT and Markdown files"
+              : busy
+                ? "Answering — press Stop, or Enter to ask something new"
+                : "Press Enter to send · Shift+Enter for a new line"}
           </span>
         </div>
       </div>

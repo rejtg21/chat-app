@@ -32,9 +32,10 @@ export const Header = ({ hasDocument }: { hasDocument: boolean }) => {
         <span
           style={{
             fontSize: 11,
+            fontWeight: 600,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
-            color: "var(--color-neutral-600)",
+            color: "var(--color-neutral-700)",
           }}
         >
           Document chat
@@ -47,9 +48,10 @@ export const Header = ({ hasDocument }: { hasDocument: boolean }) => {
           alignItems: "center",
           gap: 7,
           fontSize: 11,
+          fontWeight: 600,
           letterSpacing: "0.08em",
           textTransform: "uppercase",
-          color: "var(--color-neutral-700)",
+          color: "var(--color-accent-700)",
         }}
       >
         <span

@@ -10,9 +10,10 @@ import type { Extraction } from "@/lib/extract";
  * to its source. The model never gets to invent a location; it can only name
  * a chunk, and the location is read back out of these fields.
  *
- * Sections come from Markdown ATX headings where they exist, from PDF page
- * boundaries otherwise, and fall back to a single section for a flat text
- * file.
+ * Sections come from Markdown ATX headings where they exist. For a PDF they
+ * come from heading-like lines found within each page, with the rest of the
+ * page kept under a "Page N" section so the outline always has a per-page
+ * anchor. A flat text file falls back to a single section.
  */
 
 export interface PreparedChunk {
@@ -186,28 +187,213 @@ const sectionsFromHeadings = (text: string): RawSection[] => {
   return sections.filter((section) => section.text.trim().length > 0);
 };
 
-/** PDF: one section per page, titled by the page's first non-empty line. */
+/**
+ * PDF: sections are the heading-like lines found within each page, with the
+ * page's remaining text kept under a section of its own. Every section keeps
+ * its page number, so a citation still resolves to "p.3" however the page was
+ * carved up.
+ *
+ * The first section of every page is always labelled "Page N - <title>", so
+ * the Outline keeps a per-page anchor even once headings are pulled out;
+ * later sections on the same page are labelled by their heading alone.
+ *
+ * PDF text arrives with no blank lines and often letter-spaced ("P R O F I L
+ * E") or column-shuffled. A line is taken as a heading when it both reads
+ * like one (short, capitalised, no sentence punctuation) and is set apart —
+ * either it was letter-spaced (a deliberate display style) or it is isolated
+ * by blank lines. Letter-spacing with no wider gap between words mashes the
+ * words together, so the label is re-segmented against a small heading
+ * vocabulary and folded back to title case.
+ */
 const sectionsFromPages = (extraction: Extraction): RawSection[] => {
-  return extraction.pages
+  const sections: RawSection[] = [];
+
+  extraction.pages
     .filter((page) => page.text.trim().length > 0)
-    .map((page) => {
-      const firstLine =
-        page.text
-          .split("\n")
-          .map((line) => line.trim())
-          .find((line) => line.length > 0) ?? "";
-      const title =
-        firstLine.length > 0 && firstLine.length <= 80
-          ? firstLine
-          : `Page ${page.page}`;
-      return {
-        title,
-        page: page.page,
-        lineStart: 1,
-        lineEnd: countLines(page.text),
-        text: page.text,
-      };
+    .forEach((page, pageIndex) => {
+      const pageNo = page.page ?? pageIndex + 1;
+      const lines = page.text.split("\n");
+      const despaced = lines.map(despace);
+      const spacedCount = despaced.filter((line) => line.spaced).length;
+      const pageTitle = derivePageTitle(despaced);
+
+      const headingRows = despaced.reduce<number[]>((rows, line, index) => {
+        if (!looksLikeHeading(line.text)) return rows;
+        const setApart = line.spaced
+          ? spacedCount >= 1
+          : (index === 0 || despaced[index - 1].text === "") ||
+            (index === despaced.length - 1 || despaced[index + 1].text === "");
+        if (setApart) rows.push(index);
+        return rows;
+      }, []);
+
+      const bounds: { title: string; start: number; end: number }[] = [];
+      if (headingRows.length === 0 || headingRows[0] > 0) {
+        bounds.push({ title: "", start: 0, end: headingRows[0] ?? lines.length });
+      }
+      headingRows.forEach((row, index) => {
+        bounds.push({
+          title: prettifyHeading(despaced[row].text),
+          // Drop the heading line itself; it is kept as the section label.
+          start: row + 1,
+          end: headingRows[index + 1] ?? lines.length,
+        });
+      });
+
+      let firstOnPage = true;
+      for (const bound of bounds) {
+        const text = lines.slice(bound.start, bound.end).join("\n");
+        if (text.trim().length === 0) continue;
+        // The first section on a page is always the "Page N" anchor, titled
+        // from the page's opening line rather than its first inner heading.
+        const title = firstOnPage ? pageTitle || bound.title : bound.title;
+        const label = firstOnPage
+          ? title
+            ? `Page ${pageNo} - ${title}`
+            : `Page ${pageNo}`
+          : bound.title;
+        firstOnPage = false;
+        sections.push({
+          title: label,
+          page: pageNo,
+          lineStart: 1,
+          lineEnd: countLines(text),
+          text,
+        });
+      }
     });
+
+  return sections.filter((section) => section.text.trim().length > 0);
+};
+
+interface DespacedLine {
+  /** Trimmed, and de-letter-spaced when the source line was letter-spaced. */
+  text: string;
+  /** The source line was letter-spaced ("P R O F I L E"). */
+  spaced: boolean;
+}
+
+/**
+ * "R E J   M E D I O D I A" → { text: "REJ MEDIODIA", spaced: true }. A run of
+ * single characters is one word; a wider gap is a word break. Lines that are
+ * not letter-spaced come back trimmed and otherwise untouched.
+ */
+const despace = (line: string): DespacedLine => {
+  const tokens = line.split(" ");
+  const present = tokens.filter((token) => token.length > 0);
+  const singles = present.filter((token) => token.length === 1);
+  if (present.length < 4 || singles.length / present.length < 0.7) {
+    return { text: line.trim(), spaced: false };
+  }
+
+  const words: string[] = [];
+  let word = "";
+  for (const token of tokens) {
+    if (token === "") {
+      if (word) words.push(word);
+      word = "";
+    } else if (token.length === 1) {
+      word += token;
+    } else {
+      if (word) words.push(word);
+      words.push(token);
+      word = "";
+    }
+  }
+  if (word) words.push(word);
+  return { text: words.join(" ").trim(), spaced: true };
+};
+
+const HEADING_FILLER = /^(a|an|and|as|at|by|for|from|in|of|on|or|the|to|with)$/i;
+
+/**
+ * Whether a line reads as a section heading: short, no trailing sentence
+ * punctuation, not a date range, and either all caps or mostly capitalised
+ * words. Runs against the de-spaced copy of the line.
+ */
+const looksLikeHeading = (line: string): boolean => {
+  const text = line.trim();
+  if (text.length < 2 || text.length > 60) return false;
+  if (/[.,;:!?]$/.test(text)) return false;
+  // "NOV 2017 - OCT 2018", "2010 – 2014": a number with a dash is a range.
+  if (/\d/.test(text) && /[-–—]/.test(text)) return false;
+
+  const letters = text.replace(/[^A-Za-z]/g, "");
+  if (letters.length < 2) return false;
+
+  const words = text.split(/\s+/);
+  if (words.length > 8) return false;
+
+  if (letters === letters.toUpperCase()) return true;
+
+  const capitalised = words.filter(
+    (word) => /^[A-Z]/.test(word) || HEADING_FILLER.test(word),
+  ).length;
+  return capitalised / words.length >= 0.75;
+};
+
+/**
+ * The vocabulary that actually turns up in document section headings, longest
+ * first so a greedy match prefers "STACKS" over "STACK". Used only to put the
+ * spaces back into a mashed-together letter-spaced heading.
+ */
+const HEADING_WORDS = [
+  "CERTIFICATIONS", "CERTIFICATION", "QUALIFICATIONS", "RESPONSIBILITIES",
+  "ACCOMPLISHMENTS", "PROFESSIONAL", "ACHIEVEMENTS", "COMPETENCIES",
+  "PUBLICATIONS", "INTRODUCTION", "ENGAGEMENTS", "EXPERIENCE", "INFORMATION",
+  "BACKGROUND", "TECHNOLOGY", "REFERENCES", "HIGHLIGHTS", "ADDITIONAL",
+  "EMPLOYMENT", "ACTIVITIES", "CONCLUSION", "TECHNICAL", "EDUCATION",
+  "LANGUAGES", "INTERESTS", "OBJECTIVE", "EXPERTISE", "VOLUNTEER", "PORTFOLIO",
+  "AWARDS", "SKILLS", "STACKS", "OTHERS", "SUMMARY", "PROFILE", "CONTACT",
+  "OFFICER", "PROJECTS", "OVERVIEW", "METHODS", "RESULTS", "ABSTRACT",
+  "FINDINGS", "STACK", "ABOUT", "TOOLS", "WORK", "CORE", "KEY", "CHIEF",
+  "SENIOR", "LEAD", "AND",
+];
+
+/** "PROFILESUMMARY" → "PROFILE SUMMARY"; anything not fully recognised is left as-is. */
+const resegment = (blob: string): string => {
+  if (blob.includes(" ") || !/^[A-Za-z]{4,}$/.test(blob)) return blob;
+  const upper = blob.toUpperCase();
+  const out: string[] = [];
+  let cursor = 0;
+  while (cursor < upper.length) {
+    const word = HEADING_WORDS.find((candidate) => upper.startsWith(candidate, cursor));
+    // A partial split reads worse than the mashed original — bail on any miss.
+    if (!word) return blob;
+    out.push(word);
+    cursor += word.length;
+  }
+  return out.join(" ");
+};
+
+/**
+ * "WORK EXPERIENCE" / "PROFILESUMMARY" → "Work Experience" / "Profile Summary".
+ * Mixed-case text is left alone, so an already-cased heading or a term like
+ * "iOS" survives untouched.
+ */
+const prettifyHeading = (text: string): string => {
+  const segmented = resegment(text);
+  const letters = segmented.replace(/[^A-Za-z]/g, "");
+  if (letters.length < 2 || letters !== letters.toUpperCase()) return segmented;
+  return segmented.replace(
+    /[A-Za-z][A-Za-z']*/g,
+    (word) => word[0] + word.slice(1).toLowerCase(),
+  );
+};
+
+/** First line of a page that is not blank, a bare number or a date range. */
+const derivePageTitle = (despaced: DespacedLine[]): string => {
+  const candidate = despaced
+    .map((line) => line.text)
+    .find(
+      (text) =>
+        text.length > 1 &&
+        /[A-Za-z]/.test(text) &&
+        !/^\d/.test(text) &&
+        !(/\d/.test(text) && /[-–—]/.test(text)),
+    );
+  if (!candidate) return "";
+  return prettifyHeading(candidate).slice(0, 60);
 };
 
 interface Piece {

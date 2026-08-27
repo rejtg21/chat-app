@@ -101,6 +101,8 @@ export interface StoredMessage {
   citations: Citation[];
   retrieval: RetrievalMeta | null;
   uiState: MessageUiState;
+  /** ISO 8601, from the row's `created_at`. */
+  createdAt: string;
 }
 
 export interface SessionPayload {
@@ -139,4 +141,4 @@ export type IndexingStage = (typeof INDEXING_STAGES)[number];
 export type IndexingEvent =
   | { type: "stage"; stage: number; label: string }
   | { type: "done"; session: SessionPayload }
-  | { type: "error"; code: string; message: string; detail?: string };
+  | { type: "error"; code: string; message: string };

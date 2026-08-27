@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/migrate.mjs",
+    "migrate:status": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/migrate.mjs status",
+    "db:reset": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/db-reset.mjs",
+    "db:reset:migrate": "pnpm db:reset -- --yes && pnpm migrate"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.37",

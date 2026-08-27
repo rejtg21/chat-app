@@ -1,12 +1,19 @@
 import { MAX_UPLOAD_BYTES } from "@/lib/config";
-import { ApiError, toErrorResponse } from "@/lib/errors";
+import {
+  ApiError,
+  SAFE_MESSAGES,
+  looksRateLimited,
+  toErrorResponse,
+} from "@/lib/errors";
 import { chunkDocument } from "@/lib/chunk";
 import { embedTexts } from "@/lib/embeddings";
 import { extractDocument, extensionOf, isAcceptedExtension } from "@/lib/extract";
 import {
   buildOutline,
   createDocument,
+  deleteDocument,
   getChunks,
+  getDocument,
   getOrCreateChat,
   insertChunksWithEmbeddings,
   listDocuments,
@@ -37,6 +44,36 @@ export const GET = async (): Promise<Response> => {
   try {
     const documents = await listDocuments();
     return Response.json({ documents }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+};
+
+/**
+ * Remove a document and its whole conversation.
+ *
+ * `DELETE /api/documents?id=…`. Chunks, embeddings, the chat and its messages
+ * all cascade from the `documents` row, so this is a single delete. The client
+ * then re-reads `GET /api/session` — the next most-recent document (or the
+ * empty state) takes over.
+ */
+export const DELETE = async (request: Request): Promise<Response> => {
+  try {
+    const id = new URL(request.url).searchParams.get("id");
+    if (!id) {
+      throw new ApiError("ERR_BAD_REQUEST", "No document was specified.");
+    }
+
+    const existing = await getDocument(id);
+    if (!existing) {
+      throw new ApiError("ERR_NOT_FOUND", "That document no longer exists.");
+    }
+
+    await deleteDocument(id);
+    return Response.json(
+      { ok: true },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -163,19 +200,22 @@ export const POST = async (request: Request): Promise<Response> => {
         }
 
         if (error instanceof ApiError) {
+          // `error.detail` is operator context — logged, never streamed.
+          if (error.status >= 500) console.error(`[${error.code}]`, error);
+          send({ type: "error", code: error.code, message: error.message });
+        } else if (looksRateLimited(error)) {
+          console.error("[upload] rate limited", error);
           send({
             type: "error",
-            code: error.code,
-            message: error.message,
-            ...(error.detail === undefined ? {} : { detail: error.detail }),
+            code: "ERR_RATE_LIMITED",
+            message: SAFE_MESSAGES.rateLimited,
           });
         } else {
           console.error("[upload] indexing failed", error);
           send({
             type: "error",
             code: "ERR_INTERNAL",
-            message: "The document could not be indexed.",
-            detail: error instanceof Error ? error.message : String(error),
+            message: "The document could not be indexed. " + SAFE_MESSAGES.internal,
           });
         }
       } finally {
