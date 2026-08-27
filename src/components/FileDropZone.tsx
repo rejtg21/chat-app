@@ -128,7 +128,7 @@ export const FileDropZone = ({
           <Upload size={30} strokeWidth={1.5} aria-hidden />
           <div style={{ textAlign: "center", lineHeight: 1.4 }}>
             <div style={{ fontSize: 15, fontWeight: 500 }}>
-              Drop to index this document
+              Drop your file here to add it
             </div>
             <div style={{ fontSize: 12, color: "var(--color-accent-700)" }}>
               {hint} — up to 20 MB

@@ -1,9 +1,49 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Blueprint } from "@/components/Blueprint";
 
-/** 3c. The user's question — right-aligned, on the accent's deepest step. */
-export const UserMessage = ({ text }: { text: string }) => {
+/**
+ * A message's time, rendered small and uppercase to match the other thread
+ * meta labels. `align` puts it under a right-aligned bubble or a left-aligned
+ * turn.
+ */
+export const MessageTime = ({
+  time,
+  align = "start",
+}: {
+  time: string;
+  align?: "start" | "end";
+}) => {
+  if (!time) return null;
   return (
-    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+    <span
+      style={{
+        display: "block",
+        marginTop: "var(--space-1)",
+        fontSize: 10,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        fontVariantNumeric: "tabular-nums",
+        color: "var(--color-neutral-600)",
+        textAlign: align === "end" ? "right" : "left",
+      }}
+    >
+      {time}
+    </span>
+  );
+};
+
+/** 3c. The user's question — right-aligned, on the accent's deepest step. */
+export const UserMessage = ({
+  text,
+  time,
+}: {
+  text: string;
+  time?: string;
+}) => {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
       <div
         style={{
           maxWidth: "78%",
@@ -17,6 +57,7 @@ export const UserMessage = ({ text }: { text: string }) => {
       >
         {text}
       </div>
+      {time ? <MessageTime time={time} align="end" /> : null}
     </div>
   );
 };
@@ -30,9 +71,10 @@ export const SystemNote = ({ text }: { text: string }) => {
         alignItems: "center",
         gap: "var(--space-3)",
         fontSize: 11,
+        fontWeight: 600,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
-        color: "var(--color-neutral-600)",
+        color: "var(--color-accent-700)",
       }}
     >
       <span style={{ height: 1, flex: 1, background: "var(--color-divider)" }} />
@@ -49,7 +91,7 @@ export const SystemNote = ({ text }: { text: string }) => {
  * reload. Distinct from `SystemNote`, which is a quiet divider; this is a
  * flagged entry with the accent rule down its edge.
  */
-export const SystemMessage = ({ text }: { text: string }) => {
+export const SystemMessage = ({ text, time }: { text: string; time?: string }) => {
   return (
     <div
       style={{
@@ -60,6 +102,9 @@ export const SystemMessage = ({ text }: { text: string }) => {
     >
       <div
         style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: "var(--space-2)",
           fontSize: 10,
           letterSpacing: "0.12em",
           textTransform: "uppercase",
@@ -67,7 +112,18 @@ export const SystemMessage = ({ text }: { text: string }) => {
           marginBottom: "var(--space-1)",
         }}
       >
-        System
+        <span>System</span>
+        {time ? (
+          <span
+            style={{
+              letterSpacing: "0.08em",
+              fontVariantNumeric: "tabular-nums",
+              color: "var(--color-neutral-600)",
+            }}
+          >
+            {time}
+          </span>
+        ) : null}
       </div>
       <p
         style={{
@@ -84,8 +140,36 @@ export const SystemMessage = ({ text }: { text: string }) => {
   );
 };
 
-/** 3e. Shown while the document search runs, before any of the answer arrives. */
-export const RetrievalShimmer = () => {
+/**
+ * 3e. Stands in for the assistant turn while a question is in flight and no
+ * answer text has arrived yet.
+ *
+ * Two phases — `searching` the document, then `generating` once retrieval is
+ * done and we are waiting on the model — plus a running clock and a Stop
+ * control, so a slow answer (a local model still loading into memory is the
+ * usual cause) reads as "working", not "frozen".
+ */
+export const PendingAnswer = ({
+  phase,
+  onStop,
+}: {
+  phase: "searching" | "generating";
+  onStop: () => void;
+}) => {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  const label =
+    phase === "searching" ? "Searching the document" : "Waiting for the model";
+  const slow = elapsed >= 8;
+
   return (
     <div>
       <div
@@ -109,13 +193,49 @@ export const RetrievalShimmer = () => {
             display: "block",
           }}
         />
-        <span>Searching the document</span>
+        <span>{label}</span>
+        {elapsed >= 3 ? (
+          <span style={{ letterSpacing: 0, textTransform: "none" }}>
+            · {elapsed}s
+          </span>
+        ) : null}
       </div>
+
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {["96%", "88%", "62%"].map((width) => (
           <div key={width} className="shimmer" style={{ height: 11, width }} />
         ))}
       </div>
+
+      {slow ? (
+        <p
+          style={{
+            margin: "var(--space-3) 0 0",
+            fontSize: 12,
+            lineHeight: 1.5,
+            color: "var(--color-neutral-600)",
+          }}
+        >
+          {phase === "generating"
+            ? "This is taking longer than usual. If you are running a local model, it may still be loading into memory."
+            : "Still searching — larger documents take a moment."}
+        </p>
+      ) : null}
+
+      <button
+        type="button"
+        className="btn btn-ghost"
+        style={{
+          height: 26,
+          marginTop: "var(--space-2)",
+          padding: "0 var(--space-2)",
+          fontSize: 12,
+          color: "var(--color-neutral-600)",
+        }}
+        onClick={onStop}
+      >
+        Stop
+      </button>
     </div>
   );
 };

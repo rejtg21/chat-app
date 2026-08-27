@@ -7,7 +7,39 @@ evidence cards — when the answer's shape calls for one.
 
 The conversation lives in Postgres, so a reload restores it.
 
-**Setup and deployment: [SETUP.md](./SETUP.md).**
+---
+
+## Run it
+
+Prerequisites: **Node 20.12+** (22 LTS recommended) and **pnpm 11**
+(`corepack enable`). You also need a Postgres database with pgvector and a way
+to reach a chat model — both covered in [SETUP.md](./SETUP.md).
+
+```bash
+cp .env.example .env.local     # then fill in DATABASE_URL — see SETUP.md for the rest
+pnpm install
+pnpm migrate                   # create the schema: documents · chunks · embeddings · chats · messages
+pnpm dev                       # http://localhost:3000
+```
+
+The first upload downloads the embedding weights (~35 MB, one time) and takes
+about 15 seconds longer than later ones; after that the model stays warm in
+the process.
+
+### Database scripts
+
+| Command | What it does |
+| --- | --- |
+| `pnpm migrate` | Apply every pending migration in `db/migrations/`, in order. Idempotent — a second run is a no-op. |
+| `pnpm migrate:status` | List which migrations are applied and which are pending. |
+| `pnpm db:reset -- --yes` | Drop every table in the `public` schema. Add `--truncate` to keep the schema and only delete rows. |
+| `pnpm db:reset:migrate` | Drop everything and rebuild from migrations in one step. |
+
+The runner prefers `DATABASE_URL_UNPOOLED` (a direct connection for DDL) and
+falls back to `DATABASE_URL`.
+
+**Full walkthrough** — local Postgres via Docker, the LM Studio local-model
+option, and deploying to Vercel: **[SETUP.md](./SETUP.md).**
 
 ---
 
@@ -78,15 +110,17 @@ Deploys on Vercel Hobby and Neon's free tier.
 ## Layout
 
 ```
-db/migrations/0001_init.sql   documents · chunks · embeddings · chats · messages
-db/migrations/0002_*.sql      widen messages.role to allow 'system'
-src/lib/                      config, db, extraction, chunking, embeddings,
-                              retrieval, prompting, schemas, repository
-src/app/api/                  documents (index) · chat (RAG) · session
-                              (restore) · messages/ui-state · messages/system
-src/components/               the UI, and structured/ for the five components
-public/sample/                a real sample document, indexed through the
-                              same pipeline as an upload
+db/migrations/0001_init.sql             documents · chunks · embeddings · chats · messages
+db/migrations/0002_system_messages.sql  widen messages.role to allow 'system'
+scripts/migrate.mjs                     migration runner (pnpm migrate / migrate:status)
+scripts/db-reset.mjs                    drop or truncate every table (pnpm db:reset)
+src/lib/                                config, db, extraction, chunking, embeddings,
+                                        retrieval, prompting, schemas, repository
+src/app/api/                            documents (index) · chat (RAG) · session
+                                        (restore) · messages/ui-state · messages/system
+src/components/                         the UI, and structured/ for the five components
+public/sample/                          a real sample document, indexed through the
+                                        same pipeline as an upload
 ```
 
 ## Design
@@ -96,3 +130,13 @@ The interface follows the Industry design system in
 card surfaces, `+` registration marks on every framed object, and one solid
 accent fill — the send button. Tokens are ported into `src/app/globals.css`
 and consumed as CSS custom properties.
+
+## Not done yet
+
+Known gaps, roughly in priority order:
+- **Architectural decomposition and separation of concerns**
+- **Solidify validation and guardrails.** The structured-output pipeline currently relies too heavily on model compliance. The classifier and component builder need stricter schema validation and explicit guardrails at each boundary: validate the classifier output against the allowed component types, validate every builder payload against its component schema, reject unsupported or malformed fields, enforce source/chunk provenance for evidence cards, prevent unsupported values or hallucinated data from entering structured components, and fall back safely to the original plain-prose answer whenever validation fails. Validation should happen both before and after model output is processed so malformed model responses never reach the client.
+- **Test scripts.** There is no `pnpm test`, no test files and no CI. The parts that most want coverage: the two-sided schema validation and plain-prose fallback in `src/lib/structured.ts`, citation resolution and the "marker outside the retrieved set is dropped" rule in `src/lib/retrieval.ts`, chunking on section boundaries in `src/lib/chunk.ts`, and `src/lib/errors.ts` — the rate-limit / 5xx / 4xx classifier and the guarantee that no raw provider text reaches the client. Tests should also cover the new validation/guardrail rules, including malformed classifier output, invalid component payloads, unsupported fields, missing required fields, invalid `chunkId` values, unsupported evidence, and fallback behavior.
+- **In-app rate limiting.** Every route is open. The error copy speaks of a per-agent request limit, but enforcement lives upstream at the AI Gateway, not in this app.
+- **Retry/backoff on transient model errors.** A rate-limited or dropped answer surfaces an error card immediately; there is no automatic retry.
+- **Observability.** Failures are `console.error` only — no structured logs, no error reporting sink.

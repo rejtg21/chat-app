@@ -19,11 +19,18 @@ export const DocumentSelect = ({
   value,
   onSelect,
   disabled,
+  markCurrentId,
 }: {
   documents: DocumentSummary[];
   value: string;
   onSelect: (documentId: string) => void;
   disabled?: boolean;
+  /**
+   * The id of the newest document. Its option is tagged "· current" so an
+   * older file is obviously not the one that was added last — and picking it
+   * again is the way back.
+   */
+  markCurrentId?: string;
 }) => {
   return (
     <span
@@ -62,6 +69,7 @@ export const DocumentSelect = ({
             {document.filename}
             {"  ·  "}
             {kindLabel(document.kind)} · {formatBytes(document.sizeBytes)}
+            {markCurrentId === document.id ? "  ·  current" : ""}
           </option>
         ))}
       </select>

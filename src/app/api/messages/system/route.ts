@@ -9,8 +9,8 @@ import { insertSystemMessage } from "@/lib/repository";
  *
  * The client already shows the live error card; this is the durable half, so
  * the record survives a reload and sits in sequence with the surrounding
- * turns. The row's id is returned so the client can drop the same message
- * into the open thread without a refetch.
+ * turns. The row's id and created_at are returned so the client can drop the
+ * same message — timestamp and all — into the open thread without a refetch.
  */
 export const runtime = "nodejs";
 
@@ -28,8 +28,8 @@ export const POST = async (request: Request): Promise<Response> => {
       });
     }
 
-    const id = await insertSystemMessage(parsed.data);
-    return Response.json({ id });
+    const { id, createdAt } = await insertSystemMessage(parsed.data);
+    return Response.json({ id, createdAt });
   } catch (error) {
     return toErrorResponse(error);
   }

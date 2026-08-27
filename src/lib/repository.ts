@@ -95,8 +95,9 @@ export const markDocumentFailed = async (
 
 /**
  * The document the app is currently grounded in: the most recent one that
- * finished indexing. "Replace" simply indexes a newer document, which then
- * wins here — and brings its own chat with it.
+ * finished indexing. Adding a newer document makes it win here — and it
+ * brings its own chat with it. Removing the current one lets the next most
+ * recent take over.
  */
 export const getCurrentDocument = async (): Promise<DocumentSummary | null> => {
   const rows = await query<DocumentRow>(
@@ -133,6 +134,16 @@ export const getDocument = async (id: string): Promise<DocumentSummary | null> =
     [id],
   );
   return rows[0] ? toDocument(rows[0]) : null;
+};
+
+/**
+ * Delete a document and everything grounded in it — its chunks, embeddings,
+ * chat and every message in that chat. The foreign keys from all four tables
+ * declare `ON DELETE CASCADE` against `documents.id`, so removing the one row
+ * clears the rest in the same statement.
+ */
+export const deleteDocument = async (id: string): Promise<void> => {
+  await execute(`DELETE FROM documents WHERE id = $1`, [id]);
 };
 
 /* ── chunks + embeddings ───────────────────────────────────────────────── */
@@ -317,6 +328,7 @@ interface MessageRow {
   citations: unknown;
   retrieval: unknown;
   ui_state: unknown;
+  created_at: string;
 }
 
 const toMessage = (row: MessageRow): StoredMessage => {
@@ -332,12 +344,13 @@ const toMessage = (row: MessageRow): StoredMessage => {
     citations: citations.success ? citations.data : [],
     retrieval: retrieval.success ? retrieval.data : null,
     uiState: uiState.success ? uiState.data : EMPTY_UI_STATE,
+    createdAt: new Date(row.created_at).toISOString(),
   };
 };
 
 export const getMessages = async (chatId: string): Promise<StoredMessage[]> => {
   const rows = await query<MessageRow>(
-    `SELECT id, role, content, structured, citations, retrieval, ui_state
+    `SELECT id, role, content, structured, citations, retrieval, ui_state, created_at
        FROM messages
       WHERE chat_id = $1 AND role IN ('user', 'assistant', 'system')
       ORDER BY seq`,
@@ -385,15 +398,15 @@ export const insertMessage = async (input: {
 export const insertSystemMessage = async (input: {
   chatId: string;
   content: string;
-}): Promise<string> => {
+}): Promise<{ id: string; createdAt: string }> => {
   const id = randomUUID();
-  await insertMessage({
-    id,
-    chatId: input.chatId,
-    role: "system",
-    content: input.content,
-  });
-  return id;
+  const rows = await query<{ created_at: string }>(
+    `INSERT INTO messages (id, chat_id, role, content, ui_state)
+     VALUES ($1, $2, 'system', $3, $4)
+     RETURNING created_at`,
+    [id, input.chatId, input.content, JSON.stringify(EMPTY_UI_STATE)],
+  );
+  return { id, createdAt: new Date(rows[0].created_at).toISOString() };
 };
 
 export const updateMessageUiState = async (

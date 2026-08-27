@@ -8,17 +8,19 @@ import { DocumentBar } from "@/components/DocumentBar";
 import { EmptyState } from "@/components/EmptyState";
 import { Suggestions } from "@/components/Suggestions";
 import { Composer } from "@/components/Composer";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { FileDropZone } from "@/components/FileDropZone";
 import { AnswerMessage } from "@/components/AnswerMessage";
 import {
   ErrorCard,
-  RetrievalShimmer,
+  PendingAnswer,
   SystemMessage,
   SystemNote,
   UserMessage,
 } from "@/components/Messages";
 import { SourcePane, type SourceTab, type UploadProgress } from "@/components/SourcePane";
 import { ACCEPT_ATTRIBUTE } from "@/lib/config";
+import { formatMessageTime } from "@/lib/format";
 import { extensionOf, isAcceptedExtension } from "@/lib/extract";
 import { readDataParts, toUIMessage } from "@/lib/session-client";
 import type { ChatUIMessage } from "@/lib/ui-messages";
@@ -52,15 +54,47 @@ export const DocumentChat = () => {
   const [fileError, setFileError] = useState<AppError | null>(null);
   const [uiState, setUiState] = useState<Record<string, MessageUiState>>({});
   const [sourceOpen, setSourceOpen] = useState(false);
+  // A file dropped over the thread while a document is already open. Held here
+  // until the reader confirms it wants to switch conversations.
+  const [pendingDrop, setPendingDrop] = useState<File | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Signatures of errors already written to the thread this session, so a
   // render that re-runs its effect does not stack duplicate system messages.
   const recordedErrors = useRef<Set<string>>(new Set());
+  // messageId → ISO `created_at`, for every message read back from the
+  // database. A live message the client has just minted is not in here; it
+  // renders against the current time until a reload replaces it with its
+  // stored row.
+  const [messageTimes, setMessageTimes] = useState<Record<string, string>>({});
   const narrow = useNarrowViewport();
 
+  const rememberMessageTimes = useCallback(
+    (stored: { id: string; createdAt: string }[]) => {
+      setMessageTimes(
+        Object.fromEntries(stored.map((message) => [message.id, message.createdAt])),
+      );
+    },
+    [],
+  );
+
   const documentId = session.document?.id ?? null;
+
+  // The open document's id lives in the URL as `?doc=<id>` so a reload
+  // restores the same conversation. This is shallow `replaceState` — it syncs
+  // the address bar without a navigation; the page's state still comes from
+  // the database on the next load.
+  const syncDocumentIdToUrl = useCallback((id: string | null) => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("doc") === (id ?? null)) return;
+    if (id) url.searchParams.set("doc", id);
+    else url.searchParams.delete("doc");
+    window.history.replaceState(null, "", url);
+  }, []);
 
   const { messages, setMessages, sendMessage, status, error, stop, clearError } =
     useChat<ChatUIMessage>({
@@ -104,6 +138,9 @@ export const DocumentChat = () => {
           return;
         }
         const { id } = (await response.json()) as { id: string };
+        // No entry is added to `messageTimes` here: a system error is being
+        // written right now, so the render-time "now" fallback already shows
+        // the right time. A reload replaces it with the stored row.
         setMessages((current) =>
           current.some((message) => message.id === id)
             ? current
@@ -143,6 +180,8 @@ export const DocumentChat = () => {
         const payload = (await response.json()) as SessionPayload;
 
         setSession(payload);
+        syncDocumentIdToUrl(payload.document?.id ?? id);
+        rememberMessageTimes(payload.messages);
         setMessages(payload.messages.map(toUIMessage));
         setUiState(
           Object.fromEntries(
@@ -154,17 +193,28 @@ export const DocumentChat = () => {
         setActiveChunkId(null);
         setSourceOpen(false);
       } catch (cause) {
-        const detail = cause instanceof Error ? cause.message : String(cause);
-        setLoadError(detail);
+        // The raw reason stays in the console; the reader gets stable copy.
+        console.error("[session] switch failed", cause);
+        setLoadError("ERR_SESSION");
         void recordSystemError(
-          `session · ${detail}`,
-          `Couldn’t open that document. ${detail}`,
+          "session · switch failed",
+          "Couldn’t open that document. Please try again in a moment.",
         );
       } finally {
         setSwitching(false);
       }
     },
-    [documentId, switching, status, stop, clearError, setMessages, recordSystemError],
+    [
+      documentId,
+      switching,
+      status,
+      stop,
+      clearError,
+      setMessages,
+      recordSystemError,
+      rememberMessageTimes,
+      syncDocumentIdToUrl,
+    ],
   );
 
   /* ── restore from the database ───────────────────────────────────────── */
@@ -177,7 +227,20 @@ export const DocumentChat = () => {
       // first paint of the thread.
       const documentsLoaded = loadDocuments();
       try {
-        const response = await fetch("/api/session", { cache: "no-store" });
+        // A `?doc=<id>` in the URL asks for that specific conversation; without
+        // it the most recently indexed document wins.
+        const requestedId = new URL(window.location.href).searchParams.get("doc");
+        let response = await fetch(
+          requestedId
+            ? `/api/session?documentId=${encodeURIComponent(requestedId)}`
+            : "/api/session",
+          { cache: "no-store" },
+        );
+        // A stale link — the document was removed, or is still indexing —
+        // falls back to the default session rather than an error card.
+        if (!response.ok && requestedId) {
+          response = await fetch("/api/session", { cache: "no-store" });
+        }
         if (!response.ok) {
           const body = (await response.json().catch(() => null)) as
             | { error?: { message?: string } }
@@ -188,6 +251,8 @@ export const DocumentChat = () => {
         if (cancelled) return;
 
         setSession(payload);
+        syncDocumentIdToUrl(payload.document?.id ?? null);
+        rememberMessageTimes(payload.messages);
         setMessages(payload.messages.map(toUIMessage));
         setUiState(
           Object.fromEntries(
@@ -195,9 +260,8 @@ export const DocumentChat = () => {
           ),
         );
       } catch (cause) {
-        if (!cancelled) {
-          setLoadError(cause instanceof Error ? cause.message : String(cause));
-        }
+        console.error("[session] load failed", cause);
+        if (!cancelled) setLoadError("ERR_SESSION");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -207,7 +271,7 @@ export const DocumentChat = () => {
     return () => {
       cancelled = true;
     };
-  }, [setMessages, loadDocuments]);
+  }, [setMessages, loadDocuments, rememberMessageTimes, syncDocumentIdToUrl]);
 
   /* ── keep the thread pinned to the newest message ────────────────────── */
 
@@ -240,11 +304,12 @@ export const DocumentChat = () => {
   );
 
   const retryLast = useCallback(() => {
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
-    if (!lastUser) return;
-    const { text } = readDataParts(lastUser);
-    // Drop the failed exchange, then re-ask in place.
-    setMessages(messages.filter((m) => m.id !== lastUser.id));
+    const lastUserIndex = messages.map((m) => m.role).lastIndexOf("user");
+    if (lastUserIndex === -1) return;
+    const { text } = readDataParts(messages[lastUserIndex]);
+    // Drop the failed exchange — the question and everything after it (the
+    // empty or half-written answer, any error note) — then re-ask in place.
+    setMessages(messages.slice(0, lastUserIndex));
     clearError();
     ask(text);
   }, [messages, setMessages, ask, clearError]);
@@ -283,14 +348,14 @@ export const DocumentChat = () => {
 
         if (!response.ok || !response.body) {
           const payload = (await response.json().catch(() => null)) as
-            | { error?: { code?: string; message?: string; detail?: string } }
+            | { error?: { code?: string; message?: string } }
             | null;
           const code = payload?.error?.code ?? "ERR_UPLOAD_FAILED";
           setUpload(null);
           setFileError({
             kind: code === "ERR_UNSUPPORTED_TYPE" ? "Unsupported file" : "Upload failed",
             message: payload?.error?.message ?? "The upload failed.",
-            code: [code, payload?.error?.detail].filter(Boolean).join(" · "),
+            code,
           });
           return;
         }
@@ -304,6 +369,8 @@ export const DocumentChat = () => {
             );
           } else if (event.type === "done") {
             setSession(event.session);
+            syncDocumentIdToUrl(event.session.document?.id ?? null);
+            rememberMessageTimes(event.session.messages);
             setMessages([]);
             setUiState({});
             setTab("outline");
@@ -318,22 +385,22 @@ export const DocumentChat = () => {
                 ? "Unsupported file"
                 : "Upload failed",
               message: event.message,
-              code: [event.code, event.detail].filter(Boolean).join(" · "),
+              code: event.code,
             });
           }
         }
       } catch (cause) {
+        console.error("[upload] request failed", cause);
         setUpload(null);
         setFileError({
           kind: "Upload failed",
-          message: "The upload did not complete.",
-          code: `ERR_NETWORK · ${
-            cause instanceof Error ? cause.message : String(cause)
-          }`,
+          message:
+            "The upload did not complete. Check your connection and try again.",
+          code: "ERR_NETWORK",
         });
       }
     },
-    [setMessages, loadDocuments],
+    [setMessages, loadDocuments, rememberMessageTimes, syncDocumentIdToUrl],
   );
 
   const loadSample = useCallback(async () => {
@@ -347,13 +414,83 @@ export const DocumentChat = () => {
         }),
       );
     } catch (cause) {
+      console.error("[sample] load failed", cause);
       setFileError({
         kind: "Upload failed",
-        message: "The sample document could not be loaded.",
-        code: `ERR_SAMPLE · ${cause instanceof Error ? cause.message : String(cause)}`,
+        message: "The sample document could not be loaded. Please try again.",
+        code: "ERR_SAMPLE",
       });
     }
   }, [indexFile]);
+
+  /* ── removing a document ─────────────────────────────────────────────── */
+
+  // Delete the open document and its whole conversation, then fall back to
+  // the next most-recent document (or the empty state) by re-reading the
+  // session from scratch.
+  const removeDocument = useCallback(async () => {
+    if (!documentId) return;
+    if (status === "streaming" || status === "submitted") stop();
+    setRemoving(true);
+
+    try {
+      const response = await fetch(
+        `/api/documents?id=${encodeURIComponent(documentId)}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null;
+        throw new Error(
+          body?.error?.message ?? `Request failed (${response.status})`,
+        );
+      }
+
+      clearError();
+      setFileError(null);
+      setLoadError(null);
+      recordedErrors.current.clear();
+
+      const next = await fetch("/api/session", { cache: "no-store" });
+      const payload = (await next.json()) as SessionPayload;
+
+      setSession(payload);
+      syncDocumentIdToUrl(payload.document?.id ?? null);
+      rememberMessageTimes(payload.messages);
+      setMessages(payload.messages.map(toUIMessage));
+      setUiState(
+        Object.fromEntries(
+          payload.messages.map((message) => [message.id, message.uiState]),
+        ),
+      );
+      setInput("");
+      setTab("outline");
+      setActiveChunkId(null);
+      setSourceOpen(false);
+      setConfirmRemove(false);
+      void loadDocuments();
+    } catch (cause) {
+      console.error("[document] delete failed", cause);
+      setConfirmRemove(false);
+      setFileError({
+        kind: "Couldn’t remove the document",
+        message: `Something went wrong while deleting it. Nothing was changed — you can try again.`,
+        code: "ERR_DELETE",
+      });
+    } finally {
+      setRemoving(false);
+    }
+  }, [
+    documentId,
+    status,
+    stop,
+    clearError,
+    setMessages,
+    rememberMessageTimes,
+    loadDocuments,
+    syncDocumentIdToUrl,
+  ]);
 
   /* ── per-message UI state ────────────────────────────────────────────── */
 
@@ -388,7 +525,7 @@ export const DocumentChat = () => {
   const document = session.document;
   const busy = status === "submitted" || status === "streaming";
   const hasUserMessage = messages.some((message) => message.role === "user");
-  const retrievalError = useMemo(() => parseRetrievalError(error), [error]);
+  const chatError = useMemo(() => parseChatError(error), [error]);
 
   const askedQuestions = useMemo(
     () =>
@@ -400,12 +537,12 @@ export const DocumentChat = () => {
 
   // Mirror the live error cards into the thread as durable system messages.
   useEffect(() => {
-    if (!retrievalError) return;
+    if (!chatError) return;
     void recordSystemError(
-      `${retrievalError.kind} · ${retrievalError.code}`,
-      `${retrievalError.kind}. ${retrievalError.message} (${retrievalError.code})`,
+      `${chatError.kind} · ${chatError.code}`,
+      `${chatError.kind}. ${chatError.message} (${chatError.code})`,
     );
-  }, [retrievalError, recordSystemError]);
+  }, [chatError, recordSystemError]);
 
   useEffect(() => {
     if (!fileError) return;
@@ -415,13 +552,29 @@ export const DocumentChat = () => {
     );
   }, [fileError, recordSystemError]);
 
-  // The assistant is retrieving while the request is in flight and no answer
-  // part has arrived yet.
-  const awaitingAnswer =
+  // While a question is in flight and no answer text has landed yet, a
+  // stand-in card (with a clock and a Stop) speaks for the empty assistant
+  // turn — rather than a lone blinking caret with no way to bail out.
+  const lastMessage = messages[messages.length - 1];
+  const lastAnswerEmpty =
+    lastMessage?.role === "assistant" &&
+    readDataParts(lastMessage).text.trim().length === 0;
+  const pending =
     busy &&
-    (messages.length === 0 ||
-      messages[messages.length - 1].role === "user" ||
-      readDataParts(messages[messages.length - 1]).retrieval === null);
+    Boolean(document) &&
+    (!lastMessage || lastMessage.role === "user" || lastAnswerEmpty);
+  const pendingPhase: "searching" | "generating" =
+    lastMessage?.role === "assistant" &&
+    readDataParts(lastMessage).retrieval !== null
+      ? "generating"
+      : "searching";
+  // Streaming ended, but nothing was said and no error was raised — the
+  // model answered with an empty completion (often: still warming up).
+  const emptyAnswer =
+    !busy &&
+    !chatError &&
+    lastMessage?.role === "assistant" &&
+    readDataParts(lastMessage).text.trim().length === 0;
 
   const showEmptyState = !document && !upload && !loading;
   const showSuggestions = Boolean(document) && !hasUserMessage && !busy;
@@ -429,13 +582,11 @@ export const DocumentChat = () => {
   // Follow-ups stand under the newest answer once it has fully landed: the
   // request has settled, the last message is the assistant's, and it carries
   // prose. Errors take the space instead when there is one.
-  const lastMessage = messages[messages.length - 1];
   const showFollowUps =
     Boolean(document) &&
     hasUserMessage &&
     !busy &&
-    !awaitingAnswer &&
-    !retrievalError &&
+    !chatError &&
     !fileError &&
     lastMessage?.role === "assistant" &&
     readDataParts(lastMessage).text.trim().length > 0;
@@ -476,8 +627,13 @@ export const DocumentChat = () => {
           }}
         >
           <FileDropZone
-            onDropFile={(file) => void indexFile(file)}
-            disabled={Boolean(upload)}
+            onDropFile={(file) => {
+              // With no document open there is no conversation to lose, so a
+              // drop indexes straight away. Otherwise it waits for a yes.
+              if (document) setPendingDrop(file);
+              else void indexFile(file);
+            }}
+            disabled={Boolean(upload) || removing}
             style={{
               flex: 1,
               minHeight: 0,
@@ -490,9 +646,11 @@ export const DocumentChat = () => {
               document={document}
               documents={documents}
               onSelect={(id) => void selectDocument(id)}
-              onReplace={() => fileInputRef.current?.click()}
+              onAddDocument={() => fileInputRef.current?.click()}
+              onRemove={() => setConfirmRemove(true)}
               onToggleSource={narrow ? () => setSourceOpen(true) : undefined}
               switching={switching}
+              removing={removing}
             />
           ) : null}
 
@@ -511,8 +669,8 @@ export const DocumentChat = () => {
               <div style={{ maxWidth: 660, margin: "0 auto" }}>
                 <ErrorCard
                   kind="Not connected"
-                  message="The app could not reach its storage. If you are running this locally, check DATABASE_URL and that the database setup has been run — the steps are in SETUP.md."
-                  code={`ERR_SESSION · ${loadError}`}
+                  message="The app could not reach its storage. Please try again in a moment, or contact support@resmediodia.space if it keeps happening."
+                  code={loadError}
                   actionLabel="Try again"
                   onAction={() => window.location.reload()}
                 />
@@ -547,16 +705,28 @@ export const DocumentChat = () => {
               {messages.map((message) => {
                 const { text, retrieval, citations, structured } =
                   readDataParts(message);
+                // Restored messages carry their stored time; a just-sent one
+                // is not in the map yet and reads as the present until a
+                // reload swaps in its row.
+                const time = formatMessageTime(
+                  messageTimes[message.id] ?? new Date().toISOString(),
+                );
 
                 if (message.role === "user") {
-                  return <UserMessage key={message.id} text={text} />;
+                  return <UserMessage key={message.id} text={text} time={time} />;
                 }
 
                 if (message.role === "system") {
-                  return <SystemMessage key={message.id} text={text} />;
+                  return (
+                    <SystemMessage key={message.id} text={text} time={time} />
+                  );
                 }
 
                 const isLast = message.id === messages[messages.length - 1]?.id;
+                // An empty last assistant turn is never a real answer — it is
+                // covered by PendingAnswer (still streaming), the error card
+                // (stream failed) or the "No answer" card (empty completion).
+                if (isLast && text.trim().length === 0) return null;
                 return (
                   <AnswerMessage
                     key={message.id}
@@ -565,6 +735,7 @@ export const DocumentChat = () => {
                     retrieval={retrieval}
                     citations={citations}
                     structured={structured}
+                    time={time}
                     uiState={uiState[message.id] ?? EMPTY_UI_STATE}
                     onToggleChecklistItem={(index) =>
                       patchUiState(message.id, (current) => ({
@@ -589,6 +760,10 @@ export const DocumentChat = () => {
                 );
               })}
 
+              {pending ? (
+                <PendingAnswer phase={pendingPhase} onStop={stop} />
+              ) : null}
+
               {showFollowUps ? (
                 <Suggestions
                   variant="followup"
@@ -597,13 +772,21 @@ export const DocumentChat = () => {
                 />
               ) : null}
 
-              {awaitingAnswer && document ? <RetrievalShimmer /> : null}
-
-              {retrievalError ? (
+              {emptyAnswer ? (
                 <ErrorCard
-                  kind={retrievalError.kind}
-                  message={retrievalError.message}
-                  code={retrievalError.code}
+                  kind="No answer"
+                  message="The model connected but sent nothing back. That usually means it was still loading, or the request was stopped."
+                  code="ERR_EMPTY_COMPLETION"
+                  actionLabel="Try again"
+                  onAction={retryLast}
+                />
+              ) : null}
+
+              {chatError ? (
+                <ErrorCard
+                  kind={chatError.kind}
+                  message={chatError.message}
+                  code={chatError.code}
                   actionLabel="Retry question"
                   onAction={retryLast}
                 />
@@ -628,6 +811,7 @@ export const DocumentChat = () => {
             value={input}
             onChange={setInput}
             onSend={() => ask(input)}
+            onStop={stop}
             onAttach={() => fileInputRef.current?.click()}
             hasDocument={Boolean(document)}
             filename={document?.filename ?? null}
@@ -641,6 +825,9 @@ export const DocumentChat = () => {
             <SlideOver onClose={() => setSourceOpen(false)}>
               <SourcePane
                 document={document}
+                documents={documents}
+                onSelectDocument={(id) => void selectDocument(id)}
+                switching={switching}
                 chunks={session.chunks}
                 outline={session.outline}
                 tab={tab}
@@ -654,6 +841,9 @@ export const DocumentChat = () => {
         ) : (
           <SourcePane
             document={document}
+            documents={documents}
+            onSelectDocument={(id) => void selectDocument(id)}
+            switching={switching}
             chunks={session.chunks}
             outline={session.outline}
             tab={tab}
@@ -664,6 +854,59 @@ export const DocumentChat = () => {
           />
         )}
       </main>
+
+      {pendingDrop ? (
+        <ConfirmDialog
+          title="Start a new conversation?"
+          body={
+            <>
+              <p style={{ margin: "0 0 var(--space-3)" }}>
+                <strong>{pendingDrop.name}</strong> will be added and opened in
+                its own conversation.
+              </p>
+              <p style={{ margin: 0 }}>
+                Your current document
+                {document ? ` (${document.filename})` : ""} and everything you’ve
+                asked about it stay saved — you can switch back to them anytime
+                from the document menu at the top.
+              </p>
+            </>
+          }
+          confirmLabel="Add and switch"
+          cancelLabel="Keep current"
+          onConfirm={() => {
+            const file = pendingDrop;
+            setPendingDrop(null);
+            void indexFile(file);
+          }}
+          onCancel={() => setPendingDrop(null)}
+        />
+      ) : null}
+
+      {confirmRemove ? (
+        <ConfirmDialog
+          title="Remove this document?"
+          tone="danger"
+          busy={removing}
+          busyLabel="Removing…"
+          body={
+            <>
+              <p style={{ margin: "0 0 var(--space-3)" }}>
+                <strong>{document?.filename}</strong> and the whole conversation
+                about it will be permanently deleted.
+              </p>
+              <p style={{ margin: 0 }}>
+                This can’t be undone. To read this document again you’ll need to
+                upload it a second time.
+              </p>
+            </>
+          }
+          confirmLabel="Remove document"
+          cancelLabel="Cancel"
+          onConfirm={() => void removeDocument()}
+          onCancel={() => setConfirmRemove(false)}
+        />
+      ) : null}
 
       <input
         ref={fileInputRef}
@@ -709,23 +952,28 @@ const readNdjson = async function* (
 };
 
 /**
- * The chat transport surfaces a failed response as an Error carrying the
- * response body. Recover the structured error so the retrieval failure gets
- * its own card and its own code line rather than a generic message.
+ * The chat transport surfaces a failed response — and a failed stream — as an
+ * Error carrying the response body. Recover the server's `{ code, message }`
+ * so a rate limit, a model outage and a retrieval failure each get their own
+ * card and copy. The raw error text is never shown: the server has already
+ * curated `message`, and the fallbacks below are static.
  */
-const parseRetrievalError = (error: Error | undefined): AppError | null => {
+const parseChatError = (error: Error | undefined): AppError | null => {
   if (!error) return null;
 
   try {
     const parsed = JSON.parse(error.message) as {
-      error?: { code?: string; message?: string; detail?: string };
+      error?: { code?: string; message?: string };
     };
     if (parsed.error?.message) {
-      return {
-        kind: "Search failed",
-        message: parsed.error.message,
-        code: [parsed.error.code, parsed.error.detail].filter(Boolean).join(" · "),
-      };
+      const code = parsed.error.code ?? "ERR_CHAT_FAILED";
+      const kind =
+        code === "ERR_RATE_LIMITED"
+          ? "Server busy"
+          : code === "ERR_MODEL_UNAVAILABLE"
+            ? "Model unavailable"
+            : "Search failed";
+      return { kind, message: parsed.error.message, code };
     }
   } catch {
     // Not JSON — fall through to the generic shape below.
@@ -734,8 +982,8 @@ const parseRetrievalError = (error: Error | undefined): AppError | null => {
   return {
     kind: "Search failed",
     message:
-      "The search did not come back. Your document and this conversation are safe — only the search failed.",
-    code: `ERR_RETRIEVAL_FAILED · ${error.message}`,
+      "The request did not come back. Your document and this conversation are safe — only this answer failed.",
+    code: "ERR_CHAT_FAILED",
   };
 };
 
