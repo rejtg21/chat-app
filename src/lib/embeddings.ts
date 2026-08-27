@@ -1,9 +1,24 @@
+import os from "node:os";
+import path from "node:path";
 import {
+  env as transformersEnv,
   pipeline,
   type FeatureExtractionPipeline,
 } from "@huggingface/transformers";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "@/lib/config";
 import { ApiError } from "@/lib/errors";
+
+/**
+ * Transformers.js caches downloaded weights under
+ * `node_modules/@huggingface/transformers/.cache` by default. On Vercel the
+ * deployment filesystem is read-only — only `/tmp` is writable — so that
+ * mkdir throws ENOENT. Redirect the cache to the OS temp dir when running on
+ * Vercel; the per-instance download (~35 MB, ~15 s) then lands somewhere it
+ * is allowed to, and warm invocations on the same instance reuse it.
+ */
+if (process.env.VERCEL) {
+  transformersEnv.cacheDir = path.join(os.tmpdir(), "hf-transformers-cache");
+}
 
 /**
  * Free, local embeddings.
