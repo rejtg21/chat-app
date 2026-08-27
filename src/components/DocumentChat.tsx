@@ -527,6 +527,14 @@ export const DocumentChat = () => {
   const hasUserMessage = messages.some((message) => message.role === "user");
   const chatError = useMemo(() => parseChatError(error), [error]);
 
+  const askedQuestions = useMemo(
+    () =>
+      messages
+        .filter((message) => message.role === "user")
+        .map((message) => readDataParts(message).text),
+    [messages],
+  );
+
   // Mirror the live error cards into the thread as durable system messages.
   useEffect(() => {
     if (!chatError) return;
@@ -570,6 +578,18 @@ export const DocumentChat = () => {
 
   const showEmptyState = !document && !upload && !loading;
   const showSuggestions = Boolean(document) && !hasUserMessage && !busy;
+
+  // Follow-ups stand under the newest answer once it has fully landed: the
+  // request has settled, the last message is the assistant's, and it carries
+  // prose. Errors take the space instead when there is one.
+  const showFollowUps =
+    Boolean(document) &&
+    hasUserMessage &&
+    !busy &&
+    !chatError &&
+    !fileError &&
+    lastMessage?.role === "assistant" &&
+    readDataParts(lastMessage).text.trim().length > 0;
 
   return (
     <div
@@ -666,7 +686,7 @@ export const DocumentChat = () => {
             ) : null}
 
             {showSuggestions && document ? (
-              <Suggestions filename={document.filename} onAsk={ask} />
+              <Suggestions variant="intro" filename={document.filename} onAsk={ask} />
             ) : null}
 
             <div
@@ -742,6 +762,14 @@ export const DocumentChat = () => {
 
               {pending ? (
                 <PendingAnswer phase={pendingPhase} onStop={stop} />
+              ) : null}
+
+              {showFollowUps ? (
+                <Suggestions
+                  variant="followup"
+                  askedQuestions={askedQuestions}
+                  onAsk={ask}
+                />
               ) : null}
 
               {emptyAnswer ? (
