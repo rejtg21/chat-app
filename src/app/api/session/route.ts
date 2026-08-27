@@ -1,8 +1,9 @@
-import { toErrorResponse } from "@/lib/errors";
+import { ApiError, toErrorResponse } from "@/lib/errors";
 import {
   buildOutline,
   getChunks,
   getCurrentDocument,
+  getDocument,
   getMessages,
   getOrCreateChat,
 } from "@/lib/repository";
@@ -14,12 +15,25 @@ import type { SessionPayload } from "@/lib/types";
  * This is what makes reload durability real rather than a localStorage
  * illusion: the document, its chunks, its outline and the entire
  * conversation are read back from Neon, keyed by the current document.
+ *
+ * With `?documentId=…` it instead restores that specific document's chat
+ * room — this is how the document dropdown switches between conversations.
+ * Without it, the most recently indexed document wins, as before.
  */
 export const runtime = "nodejs";
 
-export const GET = async (): Promise<Response> => {
+export const GET = async (request: Request): Promise<Response> => {
   try {
-    const document = await getCurrentDocument();
+    const requestedId = new URL(request.url).searchParams.get("documentId");
+    const document = requestedId
+      ? await getDocument(requestedId)
+      : await getCurrentDocument();
+
+    if (requestedId && (!document || document.status !== "ready")) {
+      throw new ApiError("ERR_NOT_FOUND", "That document is not available.", {
+        detail: `document ${requestedId} is ${document?.status ?? "missing"}`,
+      });
+    }
 
     if (!document) {
       const empty: SessionPayload = {

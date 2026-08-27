@@ -9,6 +9,7 @@ import {
   getChunks,
   getOrCreateChat,
   insertChunksWithEmbeddings,
+  listDocuments,
   markDocumentFailed,
   markDocumentReady,
 } from "@/lib/repository";
@@ -27,12 +28,26 @@ import type { IndexingEvent, SessionPayload } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+/**
+ * The document dropdown's data: every indexed document, newest first. Each is
+ * a separate chat room — selecting one loads its conversation via
+ * GET /api/session?documentId=….
+ */
+export const GET = async (): Promise<Response> => {
+  try {
+    const documents = await listDocuments();
+    return Response.json({ documents }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+};
+
 const STAGES = [
   "Uploading file",
-  "Extracting text",
-  "Chunking",
-  "Embedding",
-  "Writing to Neon",
+  "Reading the text",
+  "Splitting into excerpts",
+  "Preparing for search",
+  "Saving",
 ] as const;
 
 export const POST = async (request: Request): Promise<Response> => {
@@ -99,7 +114,7 @@ export const POST = async (request: Request): Promise<Response> => {
         if (chunks.length === 0) {
           throw new ApiError(
             "ERR_EMPTY_DOCUMENT",
-            "There was no text to index in that file.",
+            "There was no readable text in that file.",
           );
         }
 

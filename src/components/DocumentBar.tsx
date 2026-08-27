@@ -1,17 +1,31 @@
+import { DocumentSelect } from "@/components/DocumentSelect";
 import { documentMeta } from "@/lib/format";
 import type { DocumentSummary } from "@/lib/types";
 
-/** 2. The "Grounded in <file>" bar, shown once a document is indexed. */
+/** 2. The "Answering from <file>" bar, shown once a document is ready. */
 export const DocumentBar = ({
   document,
+  documents,
+  onSelect,
   onReplace,
   onToggleSource,
+  switching,
 }: {
   document: DocumentSummary;
+  /** Every indexed document — the dropdown's options. */
+  documents: DocumentSummary[];
+  /** Switch to another document's chat room. */
+  onSelect: (documentId: string) => void;
   onReplace: () => void;
   /** Only supplied below the breakpoint, where the source pane is a slide-over. */
   onToggleSource?: () => void;
+  /** True while a chat room is being loaded — locks the dropdown. */
+  switching?: boolean;
 }) => {
+  // With a single document there is nothing to choose between, so the name
+  // stays a plain label rather than a one-option menu.
+  const hasChoice = documents.length > 1;
+
   return (
     <div
       style={{
@@ -32,19 +46,28 @@ export const DocumentBar = ({
           flex: "none",
         }}
       >
-        Grounded in
+        Answering from
       </span>
-      <span
-        style={{
-          fontFamily: "var(--font-heading)",
-          fontSize: 16,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {document.filename}
-      </span>
+      {hasChoice ? (
+        <DocumentSelect
+          documents={documents}
+          value={document.id}
+          onSelect={onSelect}
+          disabled={switching}
+        />
+      ) : (
+        <span
+          style={{
+            fontFamily: "var(--font-heading)",
+            fontSize: 16,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {document.filename}
+        </span>
+      )}
       <span
         style={{
           fontSize: 11,

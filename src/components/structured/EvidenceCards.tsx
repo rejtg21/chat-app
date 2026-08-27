@@ -6,10 +6,10 @@ import { Kicker, structuredBlockStyle } from "./Kicker";
 import type { ResolvedEvidenceCardsPayload } from "@/lib/structured";
 
 /**
- * Evidence cards are the retrieval pipeline made inspectable: the rank, the
- * cosine score and the passage itself. The model only ever named a chunk —
- * the excerpt and the location were resolved from the database before this
- * ever reached the browser.
+ * Evidence cards make the source visible: the rank, how closely it matched
+ * and the passage itself. The model only ever named an excerpt — the text and
+ * the location were resolved from the database before this ever reached the
+ * browser.
  */
 export const EvidenceCards = ({
   payload,

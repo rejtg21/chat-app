@@ -3,7 +3,6 @@
 import { ArrowUp, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Blueprint } from "@/components/Blueprint";
-import { DB_LABEL } from "@/lib/config";
 
 export const Composer = ({
   value,
@@ -12,7 +11,6 @@ export const Composer = ({
   onAttach,
   hasDocument,
   filename,
-  chatId,
   busy,
 }: {
   value: string;
@@ -21,7 +19,6 @@ export const Composer = ({
   onAttach: () => void;
   hasDocument: boolean;
   filename: string | null;
-  chatId: string | null;
   busy: boolean;
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -121,9 +118,6 @@ export const Composer = ({
             {hasDocument
               ? "Enter to send · Shift+Enter for a new line"
               : "PDF, TXT or Markdown"}
-          </span>
-          <span>
-            {hasDocument && chatId ? `Chat ${chatId.slice(0, 4)} · ${DB_LABEL}` : ""}
           </span>
         </div>
       </div>

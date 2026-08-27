@@ -47,7 +47,13 @@ export const POST = async (request: Request): Promise<Response> => {
       });
     }
 
-    const { documentId, messages } = parsed.data;
+    const { documentId } = parsed.data;
+    // `system` messages are the app's own error notes in the thread. They are
+    // persisted and rendered, but they are not conversation the model should
+    // see — drop them before anything downstream reads the history.
+    const messages = parsed.data.messages.filter(
+      (message) => message.role !== "system",
+    );
 
     const document = await getDocument(documentId);
     if (!document || document.status !== "ready") {

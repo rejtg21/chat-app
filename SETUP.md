@@ -16,13 +16,14 @@ locally and cost nothing.
 3. Copy the **pooled** connection string — the host contains `-pooler`. These
    routes run on the Node runtime with a real connection pool, so the pooled
    endpoint is the right one.
-4. Run the migration:
+4. Run the migrations, in order:
 
    ```bash
    psql "$DATABASE_URL" -f db/migrations/0001_init.sql
+   psql "$DATABASE_URL" -f db/migrations/0002_system_messages.sql
    ```
 
-   No `psql` to hand? Paste the file into the Neon SQL Editor instead.
+   No `psql` to hand? Paste each file into the Neon SQL Editor instead.
 
 ### Option B — local Postgres (how the pipeline was tested)
 
@@ -33,6 +34,8 @@ docker run -d --name docdesk-pg \
 
 docker exec -i docdesk-pg psql -U postgres -d docdesk \
   < db/migrations/0001_init.sql
+docker exec -i docdesk-pg psql -U postgres -d docdesk \
+  < db/migrations/0002_system_messages.sql
 ```
 
 Then `DATABASE_URL=postgresql://postgres:docdesk@localhost:55432/docdesk`.

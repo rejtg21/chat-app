@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { Blueprint } from "@/components/Blueprint";
-import { EMBEDDING_DIMENSIONS, STORE_LINE } from "@/lib/config";
-import { documentMeta, formatBytes, pluralise, vectorLine } from "@/lib/format";
+import { STORE_LINE } from "@/lib/config";
+import { documentMeta, formatBytes, pluralise } from "@/lib/format";
 import type {
   ChunkRecord,
   DocumentSummary,
@@ -108,7 +108,7 @@ export const SourcePane = ({
                 checked={tab === "chunks"}
                 onChange={() => onTabChange("chunks")}
               />
-              <span>Chunks {document.chunkCount}</span>
+              <span>Excerpts {document.chunkCount}</span>
             </label>
           </div>
         ) : null}
@@ -161,10 +161,10 @@ export const SourcePane = ({
 const ParsingPanel = ({ upload }: { upload: UploadProgress }) => {
   const stages = [
     "Uploading file",
-    "Extracting text",
-    "Chunking",
-    "Embedding",
-    "Writing to Neon",
+    "Reading the text",
+    "Splitting into excerpts",
+    "Preparing for search",
+    "Saving",
   ];
   const percent = Math.round(((upload.stage + 1) / stages.length) * 100);
 
@@ -179,7 +179,7 @@ const ParsingPanel = ({ upload }: { upload: UploadProgress }) => {
         <div
           style={{ marginTop: 2, fontSize: 11, color: "var(--color-neutral-600)" }}
         >
-          {formatBytes(upload.sizeBytes)} · parsing
+          {formatBytes(upload.sizeBytes)} · reading
         </div>
         <div
           style={{
@@ -300,7 +300,7 @@ const SourceEmpty = () => {
           maxWidth: 220,
         }}
       >
-        Sections and chunks appear here once a file is indexed.
+        Sections and excerpts appear here once you add a file.
       </p>
     </div>
   );
@@ -368,7 +368,7 @@ const Outline = ({
                   color: "var(--color-neutral-600)",
                 }}
               >
-                {[section.range, pluralise(section.chunkCount, "chunk")]
+                {[section.range, pluralise(section.chunkCount, "excerpt")]
                   .filter(Boolean)
                   .join(" · ")}
               </span>
@@ -381,9 +381,9 @@ const Outline = ({
 };
 
 /**
- * 5d. Chunk ids, token counts and vector widths are exposed on purpose: the
- * retrieval pipeline is what makes the answers credible, so it is inspectable
- * rather than hidden.
+ * 5d. The exact excerpts and where they sit in the document are shown on
+ * purpose: seeing the source text is what makes the answers credible, so it
+ * is inspectable rather than hidden.
  */
 const Chunks = ({
   chunks,
@@ -430,16 +430,6 @@ const Chunks = ({
             <p style={{ margin: "var(--space-2) 0 0", fontSize: 13, lineHeight: 1.55 }}>
               {chunk.text}
             </p>
-            <div
-              style={{
-                marginTop: "var(--space-2)",
-                fontSize: 10,
-                fontFamily: "var(--font-mono)",
-                color: "var(--color-neutral-500)",
-              }}
-            >
-              {vectorLine(EMBEDDING_DIMENSIONS, chunk.tokenCount)}
-            </div>
           </div>
         );
       })}

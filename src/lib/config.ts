@@ -1,3 +1,6 @@
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import type { LanguageModel } from "ai";
+
 /**
  * Single source of truth for the values that have to agree across the
  * database schema, the API routes and the UI copy.
@@ -12,18 +15,42 @@ export const EMBEDDING_MODEL = "Supabase/gte-small";
 export const EMBEDDING_DIMENSIONS = 384;
 
 /**
- * Chat model, addressed as a plain "provider/model" string through the
- * Vercel AI Gateway. Override with CHAT_MODEL to swap providers without
- * touching code.
+ * Local-model escape hatch. Set LMSTUDIO_BASE_URL (e.g.
+ * "http://localhost:1234/v1") to route every LLM call at an OpenAI-compatible
+ * server — LM Studio, Ollama, llama.cpp — instead of the Vercel AI Gateway.
+ * Unset it and the Gateway path below is unchanged.
  */
-export const CHAT_MODEL = process.env.CHAT_MODEL ?? "anthropic/claude-sonnet-5";
+const lmStudio = process.env.LMSTUDIO_BASE_URL
+  ? createOpenAICompatible({
+      name: "lmstudio",
+      baseURL: process.env.LMSTUDIO_BASE_URL,
+      // LM Studio ignores the key but the SDK still sends an Authorization header.
+      apiKey: process.env.LMSTUDIO_API_KEY ?? "lm-studio",
+    })
+  : null;
+
+/**
+ * Chat model. Through the Vercel AI Gateway by default, addressed as a plain
+ * "provider/model" string; override with CHAT_MODEL to swap providers without
+ * touching code. When LMSTUDIO_BASE_URL is set, CHAT_MODEL is instead the id
+ * of the model loaded in LM Studio.
+ */
+export const CHAT_MODEL: LanguageModel = lmStudio
+  ? lmStudio(process.env.CHAT_MODEL ?? "local-model")
+  : process.env.CHAT_MODEL ?? "anthropic/claude-sonnet-5";
 
 /**
  * Model used for the post-answer annotation pass (citations + the structured
- * component). Cheaper/faster than the answer model by default.
+ * component). Cheaper/faster than the answer model by default. Falls back to
+ * the chat model when running locally — one loaded model is the common case.
  */
-export const ANNOTATION_MODEL =
-  process.env.ANNOTATION_MODEL ?? process.env.CHAT_MODEL ?? "anthropic/claude-haiku-4.5";
+export const ANNOTATION_MODEL: LanguageModel = lmStudio
+  ? lmStudio(
+      process.env.ANNOTATION_MODEL ?? process.env.CHAT_MODEL ?? "local-model",
+    )
+  : process.env.ANNOTATION_MODEL ??
+    process.env.CHAT_MODEL ??
+    "anthropic/claude-haiku-4.5";
 
 /** Upload limits, per the design's "PDF · TXT · MD — up to 20 MB". */
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -62,4 +89,4 @@ export const CHUNK_OVERLAP_CHARS = 160;
 
 /** Shown in the header and the source-pane footer. */
 export const DB_LABEL = "Neon";
-export const STORE_LINE = `documents · chunks · embeddings · chats · messages — 5 tables in ${DB_LABEL}`;
+export const STORE_LINE = "Your document and chat history are saved automatically.";

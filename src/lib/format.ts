@@ -23,24 +23,24 @@ export const pluralise = (count: number, noun: string): string => {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 };
 
-/** "Markdown · 42 KB · 9 chunks" — the document bar and outline header. */
+/** "Markdown · 42 KB · 9 excerpts" — the document bar and outline header. */
 export const documentMeta = (document: DocumentSummary): string => {
   return [
     kindLabel(document.kind),
     formatBytes(document.sizeBytes),
-    pluralise(document.chunkCount, "chunk"),
+    pluralise(document.chunkCount, "excerpt"),
   ].join(" · ");
 };
 
-/** "chunk_04" from a zero-based ordinal. */
+/** "Excerpt 4" from a zero-based ordinal. */
 export const chunkLabel = (ordinal: number): string => {
-  return `chunk_${String(ordinal + 1).padStart(2, "0")}`;
+  return `Excerpt ${ordinal + 1}`;
 };
 
 /**
- * The location half of a citation: "§3 Engagement by format · L44–52", or
- * "§2 Methods · p.4" for a PDF. Built only from stored columns, never from
- * anything the model produced.
+ * The location half of a citation: "Section 3 · Engagement by format · lines
+ * 44–52", or "Section 2 · Methods · page 4" for a PDF. Built only from stored
+ * columns, never from anything the model produced.
  */
 export const chunkWhere = (chunk: {
   sectionOrdinal: number;
@@ -50,13 +50,13 @@ export const chunkWhere = (chunk: {
   lineEnd: number | null;
 }): string => {
   const section = chunk.sectionLabel
-    ? `§${chunk.sectionOrdinal} ${chunk.sectionLabel}`
-    : `§${chunk.sectionOrdinal}`;
+    ? `Section ${chunk.sectionOrdinal} · ${chunk.sectionLabel}`
+    : `Section ${chunk.sectionOrdinal}`;
   const locus =
     chunk.page !== null
-      ? `p.${chunk.page}`
+      ? `page ${chunk.page}`
       : chunk.lineStart !== null && chunk.lineEnd !== null
-        ? `L${chunk.lineStart}–${chunk.lineEnd}`
+        ? `lines ${chunk.lineStart}–${chunk.lineEnd}`
         : null;
   return locus ? `${section} · ${locus}` : section;
 };
@@ -66,22 +66,15 @@ export const citationWhere = (filename: string, chunk: ChunkRecord): string => {
   return `${filename} · ${chunk.where}`;
 };
 
-/** "vector[384] · 142 tokens" — the chunk card footer. */
-export const vectorLine = (dimensions: number, tokenCount: number): string => {
-  return `vector[${dimensions}] · ${pluralise(tokenCount, "token")}`;
-};
-
-/** "3 chunks retrieved · cosine 0.71–0.91", or the not-found variant. */
+/** "Based on 3 excerpts", or the not-found variant. */
 export const retrievalLabel = (meta: {
   retrieved: number;
   minScore: number | null;
   maxScore: number | null;
   notFound: boolean;
 }): string => {
-  if (meta.notFound || meta.retrieved === 0) return "no passage above threshold";
-  const range =
-    meta.minScore !== null && meta.maxScore !== null
-      ? ` · cosine ${meta.minScore.toFixed(2)}–${meta.maxScore.toFixed(2)}`
-      : "";
-  return `${pluralise(meta.retrieved, "chunk")} retrieved${range}`;
+  if (meta.notFound || meta.retrieved === 0) {
+    return "Nothing in this document matched";
+  }
+  return `Based on ${pluralise(meta.retrieved, "excerpt")}`;
 };

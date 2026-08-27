@@ -1,5 +1,3 @@
-import { DB_LABEL } from "@/lib/config";
-
 /**
  * The prototype's "Demo" cluster (Bad file / Retrieval error / Reset) is not
  * product surface — it existed to make the error states reachable in a
@@ -62,9 +60,7 @@ export const Header = ({ hasDocument }: { hasDocument: boolean }) => {
             display: "block",
           }}
         />
-        <span>
-          {DB_LABEL} · {hasDocument ? "conversation persisted" : "connected"}
-        </span>
+        <span>{hasDocument ? "Conversation saved" : "Connected"}</span>
       </div>
     </header>
   );

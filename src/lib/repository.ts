@@ -110,6 +110,21 @@ export const getCurrentDocument = async (): Promise<DocumentSummary | null> => {
   return rows[0] ? toDocument(rows[0]) : null;
 };
 
+/**
+ * Every indexed document, newest first. Each one is its own chat room in the
+ * document dropdown; picking one restores that document's whole conversation.
+ */
+export const listDocuments = async (): Promise<DocumentSummary[]> => {
+  const rows = await query<DocumentRow>(
+    `SELECT id, filename, kind, mime_type, size_bytes, page_count, line_count,
+            chunk_count, status, created_at
+       FROM documents
+      WHERE status = 'ready'
+      ORDER BY created_at DESC`,
+  );
+  return rows.map(toDocument);
+};
+
 export const getDocument = async (id: string): Promise<DocumentSummary | null> => {
   const rows = await query<DocumentRow>(
     `SELECT id, filename, kind, mime_type, size_bytes, page_count, line_count,
@@ -296,7 +311,7 @@ export const getOrCreateChat = async (documentId: string): Promise<string> => {
 
 interface MessageRow {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   structured: unknown;
   citations: unknown;
@@ -324,7 +339,7 @@ export const getMessages = async (chatId: string): Promise<StoredMessage[]> => {
   const rows = await query<MessageRow>(
     `SELECT id, role, content, structured, citations, retrieval, ui_state
        FROM messages
-      WHERE chat_id = $1 AND role IN ('user', 'assistant')
+      WHERE chat_id = $1 AND role IN ('user', 'assistant', 'system')
       ORDER BY seq`,
     [chatId],
   );
@@ -334,7 +349,7 @@ export const getMessages = async (chatId: string): Promise<StoredMessage[]> => {
 export const insertMessage = async (input: {
   id: string;
   chatId: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   structured?: unknown;
   citations?: readonly Citation[];
@@ -361,6 +376,24 @@ export const insertMessage = async (input: {
       JSON.stringify(EMPTY_UI_STATE),
     ],
   );
+};
+
+/**
+ * Record an app-level error as a message in the thread. Keyed to the chat so
+ * it replays in sequence with the turns around it after a reload.
+ */
+export const insertSystemMessage = async (input: {
+  chatId: string;
+  content: string;
+}): Promise<string> => {
+  const id = randomUUID();
+  await insertMessage({
+    id,
+    chatId: input.chatId,
+    role: "system",
+    content: input.content,
+  });
+  return id;
 };
 
 export const updateMessageUiState = async (

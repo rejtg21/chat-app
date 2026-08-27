@@ -12,21 +12,19 @@ import { AnswerMessage } from "@/components/AnswerMessage";
 import {
   ErrorCard,
   RetrievalShimmer,
+  SystemMessage,
   SystemNote,
   UserMessage,
 } from "@/components/Messages";
 import { SourcePane, type SourceTab, type UploadProgress } from "@/components/SourcePane";
-import {
-  ACCEPT_ATTRIBUTE,
-  DB_LABEL,
-  EMBEDDING_DIMENSIONS,
-} from "@/lib/config";
+import { ACCEPT_ATTRIBUTE } from "@/lib/config";
 import { extensionOf, isAcceptedExtension } from "@/lib/extract";
 import { readDataParts, toUIMessage } from "@/lib/session-client";
 import type { ChatUIMessage } from "@/lib/ui-messages";
 import {
   EMPTY_UI_STATE,
   type AppError,
+  type DocumentSummary,
   type IndexingEvent,
   type MessageUiState,
   type SessionPayload,
@@ -42,7 +40,9 @@ const EMPTY_SESSION: SessionPayload = {
 
 export const DocumentChat = () => {
   const [session, setSession] = useState<SessionPayload>(EMPTY_SESSION);
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [switching, setSwitching] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [tab, setTab] = useState<SourceTab>("outline");
@@ -54,6 +54,9 @@ export const DocumentChat = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Signatures of errors already written to the thread this session, so a
+  // render that re-runs its effect does not stack duplicate system messages.
+  const recordedErrors = useRef<Set<string>>(new Set());
   const narrow = useNarrowViewport();
 
   const documentId = session.document?.id ?? null;
@@ -63,12 +66,115 @@ export const DocumentChat = () => {
       transport: new DefaultChatTransport({ api: "/api/chat" }),
     });
 
+  /* ── the document dropdown ───────────────────────────────────────────── */
+
+  // Every indexed document is its own chat room. This list is the dropdown's
+  // options; it is an enhancement, so a failed fetch is swallowed rather than
+  // surfaced as an error card.
+  const loadDocuments = useCallback(async () => {
+    try {
+      const response = await fetch("/api/documents", { cache: "no-store" });
+      if (!response.ok) return;
+      const body = (await response.json()) as { documents: DocumentSummary[] };
+      setDocuments(body.documents);
+    } catch {
+      /* keep whatever list we already have */
+    }
+  }, []);
+
+  // Write an error into the thread as a `system` message: persisted to the
+  // database and dropped into the open conversation without a refetch. The
+  // live error card is still shown alongside — this is the durable record of
+  // "something went wrong here" that survives a reload.
+  const recordSystemError = useCallback(
+    async (signature: string, text: string) => {
+      const chatId = session.chatId;
+      if (!chatId || recordedErrors.current.has(signature)) return;
+      recordedErrors.current.add(signature);
+
+      try {
+        const response = await fetch("/api/messages/system", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatId, content: text }),
+        });
+        if (!response.ok) {
+          recordedErrors.current.delete(signature);
+          return;
+        }
+        const { id } = (await response.json()) as { id: string };
+        setMessages((current) =>
+          current.some((message) => message.id === id)
+            ? current
+            : [...current, { id, role: "system", parts: [{ type: "text", text }] }],
+        );
+      } catch {
+        // A failed write is not worth interrupting the reader for; the live
+        // error card already told them what happened.
+        recordedErrors.current.delete(signature);
+      }
+    },
+    [session.chatId, setMessages],
+  );
+
+  const selectDocument = useCallback(
+    async (id: string) => {
+      if (id === documentId || switching) return;
+      // Leaving a room cancels whatever it was still streaming.
+      if (status === "streaming" || status === "submitted") stop();
+      clearError();
+      setFileError(null);
+      setSwitching(true);
+
+      try {
+        const response = await fetch(
+          `/api/session?documentId=${encodeURIComponent(id)}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as
+            | { error?: { message?: string } }
+            | null;
+          throw new Error(
+            body?.error?.message ?? `Request failed (${response.status})`,
+          );
+        }
+        const payload = (await response.json()) as SessionPayload;
+
+        setSession(payload);
+        setMessages(payload.messages.map(toUIMessage));
+        setUiState(
+          Object.fromEntries(
+            payload.messages.map((message) => [message.id, message.uiState]),
+          ),
+        );
+        setInput("");
+        setTab("outline");
+        setActiveChunkId(null);
+        setSourceOpen(false);
+      } catch (cause) {
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        setLoadError(detail);
+        void recordSystemError(
+          `session · ${detail}`,
+          `Couldn’t open that document. ${detail}`,
+        );
+      } finally {
+        setSwitching(false);
+      }
+    },
+    [documentId, switching, status, stop, clearError, setMessages, recordSystemError],
+  );
+
   /* ── restore from the database ───────────────────────────────────────── */
 
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
+      // Fetched alongside the session so the dropdown fills without delaying
+      // first paint of the thread.
+      const documentsLoaded = loadDocuments();
       try {
         const response = await fetch("/api/session", { cache: "no-store" });
         if (!response.ok) {
@@ -94,12 +200,13 @@ export const DocumentChat = () => {
       } finally {
         if (!cancelled) setLoading(false);
       }
+      await documentsLoaded;
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [setMessages]);
+  }, [setMessages, loadDocuments]);
 
   /* ── keep the thread pinned to the newest message ────────────────────── */
 
@@ -156,7 +263,7 @@ export const DocumentChat = () => {
           message: `“${file.name}” is a ${
             extension ? extension.toUpperCase() : "unrecognised"
           } file. This app reads PDF, TXT and Markdown.`,
-          code: `ERR_UNSUPPORTED_TYPE · nothing was written to ${DB_LABEL}`,
+          code: "ERR_UNSUPPORTED_TYPE · nothing was saved",
         });
         return;
       }
@@ -201,6 +308,8 @@ export const DocumentChat = () => {
             setTab("outline");
             setActiveChunkId(null);
             setUpload(null);
+            // The new document is now the current room — refresh the dropdown.
+            void loadDocuments();
           } else {
             setUpload(null);
             setFileError({
@@ -223,7 +332,7 @@ export const DocumentChat = () => {
         });
       }
     },
-    [setMessages],
+    [setMessages, loadDocuments],
   );
 
   const loadSample = useCallback(async () => {
@@ -280,6 +389,23 @@ export const DocumentChat = () => {
   const hasUserMessage = messages.some((message) => message.role === "user");
   const retrievalError = useMemo(() => parseRetrievalError(error), [error]);
 
+  // Mirror the live error cards into the thread as durable system messages.
+  useEffect(() => {
+    if (!retrievalError) return;
+    void recordSystemError(
+      `${retrievalError.kind} · ${retrievalError.code}`,
+      `${retrievalError.kind}. ${retrievalError.message} (${retrievalError.code})`,
+    );
+  }, [retrievalError, recordSystemError]);
+
+  useEffect(() => {
+    if (!fileError) return;
+    void recordSystemError(
+      `${fileError.kind} · ${fileError.code}`,
+      `${fileError.kind}. ${fileError.message} (${fileError.code})`,
+    );
+  }, [fileError, recordSystemError]);
+
   // The assistant is retrieving while the request is in flight and no answer
   // part has arrived yet.
   const awaitingAnswer =
@@ -329,8 +455,11 @@ export const DocumentChat = () => {
           {document ? (
             <DocumentBar
               document={document}
+              documents={documents}
+              onSelect={(id) => void selectDocument(id)}
               onReplace={() => fileInputRef.current?.click()}
               onToggleSource={narrow ? () => setSourceOpen(true) : undefined}
+              switching={switching}
             />
           ) : null}
 
@@ -343,13 +472,13 @@ export const DocumentChat = () => {
               padding: "var(--space-8) var(--space-6)",
             }}
           >
-            {loading ? <ThreadSkeleton /> : null}
+            {loading || switching ? <ThreadSkeleton /> : null}
 
             {loadError ? (
               <div style={{ maxWidth: 660, margin: "0 auto" }}>
                 <ErrorCard
                   kind="Not connected"
-                  message={`The app could not reach ${DB_LABEL}. Check DATABASE_URL and that the migration has been run — the steps are in SETUP.md.`}
+                  message="The app could not reach its storage. If you are running this locally, check DATABASE_URL and that the database setup has been run — the steps are in SETUP.md."
                   code={`ERR_SESSION · ${loadError}`}
                   actionLabel="Try again"
                   onAction={() => window.location.reload()}
@@ -366,11 +495,7 @@ export const DocumentChat = () => {
             ) : null}
 
             {showSuggestions && document ? (
-              <Suggestions
-                filename={document.filename}
-                chunkCount={document.chunkCount}
-                onAsk={ask}
-              />
+              <Suggestions filename={document.filename} onAsk={ask} />
             ) : null}
 
             <div
@@ -383,9 +508,7 @@ export const DocumentChat = () => {
               }}
             >
               {document ? (
-                <SystemNote
-                  text={`Indexed ${document.chunkCount} chunks · ${EMBEDDING_DIMENSIONS}-d embeddings · stored in ${DB_LABEL}`}
-                />
+                <SystemNote text={`Answers come only from ${document.filename}`} />
               ) : null}
 
               {messages.map((message) => {
@@ -394,6 +517,10 @@ export const DocumentChat = () => {
 
                 if (message.role === "user") {
                   return <UserMessage key={message.id} text={text} />;
+                }
+
+                if (message.role === "system") {
+                  return <SystemMessage key={message.id} text={text} />;
                 }
 
                 const isLast = message.id === messages[messages.length - 1]?.id;
@@ -429,9 +556,7 @@ export const DocumentChat = () => {
                 );
               })}
 
-              {awaitingAnswer && document ? (
-                <RetrievalShimmer chunkCount={document.chunkCount} />
-              ) : null}
+              {awaitingAnswer && document ? <RetrievalShimmer /> : null}
 
               {retrievalError ? (
                 <ErrorCard
@@ -465,7 +590,6 @@ export const DocumentChat = () => {
             onAttach={() => fileInputRef.current?.click()}
             hasDocument={Boolean(document)}
             filename={document?.filename ?? null}
-            chatId={session.chatId}
             busy={busy}
           />
         </section>
@@ -556,7 +680,7 @@ const parseRetrievalError = (error: Error | undefined): AppError | null => {
     };
     if (parsed.error?.message) {
       return {
-        kind: "Retrieval failed",
+        kind: "Search failed",
         message: parsed.error.message,
         code: [parsed.error.code, parsed.error.detail].filter(Boolean).join(" · "),
       };
@@ -566,8 +690,9 @@ const parseRetrievalError = (error: Error | undefined): AppError | null => {
   }
 
   return {
-    kind: "Retrieval failed",
-    message: `The vector search did not come back. Your document and this conversation are safe in ${DB_LABEL} — only the lookup failed.`,
+    kind: "Search failed",
+    message:
+      "The search did not come back. Your document and this conversation are safe — only the search failed.",
     code: `ERR_RETRIEVAL_FAILED · ${error.message}`,
   };
 };

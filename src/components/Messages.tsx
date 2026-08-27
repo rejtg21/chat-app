@@ -42,8 +42,50 @@ export const SystemNote = ({ text }: { text: string }) => {
   );
 };
 
-/** 3e. Shown while the vector search runs, before any token arrives. */
-export const RetrievalShimmer = ({ chunkCount }: { chunkCount: number }) => {
+/**
+ * 3d-bis. The app speaking for itself. Written when an error is worth the
+ * reader knowing about after the fact — a failed document switch, a retrieval
+ * failure, a rejected upload — and persisted with the thread so it survives a
+ * reload. Distinct from `SystemNote`, which is a quiet divider; this is a
+ * flagged entry with the accent rule down its edge.
+ */
+export const SystemMessage = ({ text }: { text: string }) => {
+  return (
+    <div
+      style={{
+        borderLeft: "2px solid var(--color-accent-700)",
+        background: "var(--color-neutral-100)",
+        padding: "var(--space-3) var(--space-4)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--color-accent-700)",
+          marginBottom: "var(--space-1)",
+        }}
+      >
+        System
+      </div>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 13,
+          lineHeight: 1.5,
+          color: "var(--color-neutral-700)",
+          whiteSpace: "pre-wrap",
+        }}
+      >
+        {text}
+      </p>
+    </div>
+  );
+};
+
+/** 3e. Shown while the document search runs, before any of the answer arrives. */
+export const RetrievalShimmer = () => {
   return (
     <div>
       <div
@@ -67,7 +109,7 @@ export const RetrievalShimmer = ({ chunkCount }: { chunkCount: number }) => {
             display: "block",
           }}
         />
-        <span>Searching {chunkCount} chunks</span>
+        <span>Searching the document</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {["96%", "88%", "62%"].map((width) => (

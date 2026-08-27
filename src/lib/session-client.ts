@@ -15,10 +15,10 @@ import type { StoredMessage } from "@/lib/types";
  * drift until a reload quietly looks different from the session that made it.
  */
 export const toUIMessage = (message: StoredMessage): ChatUIMessage => {
-  if (message.role === "user") {
+  if (message.role === "user" || message.role === "system") {
     return {
       id: message.id,
-      role: "user",
+      role: message.role,
       parts: [{ type: "text", text: message.content }],
     };
   }

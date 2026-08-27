@@ -23,11 +23,9 @@ const SUGGESTIONS = [
 
 export const Suggestions = ({
   filename,
-  chunkCount,
   onAsk,
 }: {
   filename: string;
-  chunkCount: number;
   onAsk: (question: string) => void;
 }) => {
   return (
@@ -42,8 +40,7 @@ export const Suggestions = ({
           color: "var(--color-neutral-700)",
         }}
       >
-        {chunkCount} chunks indexed · answers cite the section and lines they came
-        from.
+        Every answer points to the exact section and lines it came from.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
         {SUGGESTIONS.map((suggestion) => (

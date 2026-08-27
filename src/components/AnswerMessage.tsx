@@ -50,7 +50,7 @@ export const AnswerMessage = ({
       >
         <span>Answer</span>
         <span style={{ height: 1, width: 26, background: "var(--color-divider)" }} />
-        <span>{retrieval ? retrievalLabel(retrieval) : "retrieving"}</span>
+        <span>{retrieval ? retrievalLabel(retrieval) : "searching"}</span>
       </div>
 
       <div style={{ fontSize: 15, lineHeight: 1.62 }}>

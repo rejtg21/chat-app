@@ -145,7 +145,7 @@ export const annotateAnswer = async (input: {
           return {
             label: card.label,
             chunkId: chunk.id,
-            score: chunk.score.toFixed(2),
+            score: `${Math.round(chunk.score * 100)}% match`,
             excerpt: chunk.text,
             where: citationWhere(input.filename, chunk),
           };

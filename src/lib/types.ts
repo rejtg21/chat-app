@@ -90,7 +90,12 @@ export const EMPTY_UI_STATE: MessageUiState = { checked: {}, expanded: {} };
 
 export interface StoredMessage {
   id: string;
-  role: "user" | "assistant";
+  /**
+   * `system` is the app speaking for itself — an error it wants the reader to
+   * see after the fact. It carries only `content`; the citation/retrieval/
+   * structured fields are always empty.
+   */
+  role: "user" | "assistant" | "system";
   content: string;
   structured: RenderablePayload | null;
   citations: Citation[];

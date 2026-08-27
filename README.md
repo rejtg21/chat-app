@@ -79,10 +79,11 @@ Deploys on Vercel Hobby and Neon's free tier.
 
 ```
 db/migrations/0001_init.sql   documents · chunks · embeddings · chats · messages
+db/migrations/0002_*.sql      widen messages.role to allow 'system'
 src/lib/                      config, db, extraction, chunking, embeddings,
                               retrieval, prompting, schemas, repository
 src/app/api/                  documents (index) · chat (RAG) · session
-                              (restore) · messages/ui-state
+                              (restore) · messages/ui-state · messages/system
 src/components/               the UI, and structured/ for the five components
 public/sample/                a real sample document, indexed through the
                               same pipeline as an upload

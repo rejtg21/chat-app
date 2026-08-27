@@ -1,6 +1,5 @@
 import { Upload } from "lucide-react";
 import { Blueprint } from "@/components/Blueprint";
-import { DB_LABEL } from "@/lib/config";
 
 /** 3a. No document loaded. */
 export const EmptyState = ({
@@ -39,8 +38,8 @@ export const EmptyState = ({
           color: "var(--color-neutral-700)",
         }}
       >
-        Upload a PDF, TXT or Markdown file. It is parsed, chunked, embedded and
-        stored in {DB_LABEL}, so this conversation survives a reload.
+        Upload a PDF, TXT or Markdown file. It is read and saved, so this
+        conversation survives a reload.
       </p>
       <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
         <button
